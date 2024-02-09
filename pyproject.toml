@@ -3,16 +3,22 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "package-name"
-description = "My package description"
+name = "interest"
+description = "A package to extract hystorical news sentiments"
 authors = [
-    {name = "name", email = "name@uu.nl"},
+    {name = "Shiva Nadi", email = "s.nadi@uu.nl"},
+    {name = "Parisa Zahedi", email = "p.zahedi@uu.nl"},
 ]
 readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 classifiers = [
+    "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Development Status :: 3 - Alpha",
     "License :: OSI Approved :: MIT License",
 ]
 dynamic = ["version"]
@@ -24,6 +30,9 @@ dependencies = [
 [project.optional-dependencies]
 lint = ["flake8"]
 test = ["pytest", "mypy"]
+
+[tool.setuptools]
+packages = ["interest"]
 
 [tool.flake8]
 max-line-length = 99
