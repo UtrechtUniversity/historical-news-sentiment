@@ -3,17 +3,38 @@ import lzma
 import re
 from collections import Counter, defaultdict
 from pathlib import Path
-from typing import List, Union, Dict
+from typing import List, Union, Dict, Optional
 import logging
 
 import xml.etree.cElementTree as et
+   
+def parse_all_articles(input_dir: Union[Path, str]) -> Dict:
+     
+     input_dir = Path(input_dir)
+     file_list = list(input_dir.glob("*.xml"))
+     # List of meta files
+     meta_file_list = list(input_dir.glob("*.didl.xml"))
+    # List of xml files excluded meta file
+     article_list = [item for item in file_list if item not in meta_file_list]
 
-def parse_raw_article(article_input_fp: Union[Path, str]) -> Dict:
+     articles: List[Dict] = []
+
+
+     for file in article_list:
+         article = parse_raw_article(file)
+         articles.append(article)
+
+     newsletter_metadata= parse_meta_file(meta_file_list[0])
+
+     news_dict = {"newsletter_metadata": newsletter_metadata, "articles": articles}
+     return news_dict
+
+def parse_raw_article(article_fp: Union[Path, str]) -> Dict:
     """Parse a raw article file into a structured list
 
     Arguments
     ---------
-    article_input_fp:
+    article_input_fp: Union[Path, str]
     Input file to process.
 
     Returns
@@ -23,41 +44,45 @@ def parse_raw_article(article_input_fp: Union[Path, str]) -> Dict:
     the title and the body of article.
      
     """
-    if article_input_fp !=None:
-        tree = et.parse(article_input_fp)
+    try:
+        tree = et.parse(article_fp)
         root = tree.getroot()
-        for title_item in root.findall('./title'):
-            title = title_item.text
-        for article_item in root.findall('./p'):
-            body = article_item.text
+    except et.ParseError as e:
+        logging.error("Failed to parse the article file:%s", e)
 
-        return title, body
+    title_values = [element.text for element in root.iter() if element.tag.endswith('title')]
+    if len(title_values)>1:
+        logging.warning("More than one titles are extracted for the article.")
+    if not title_values:
+        logging.warning("No title is extracted for the article.")
+        title = None
+    else:
+        title = title_values[0]
 
+    body_values = [element.text for element in root.iter() if element.tag.endswith('p')]
+    if not body_values:
+        logging.warning("No body is extracted.")
+        body = None
+    if len(body_values)>1:
+        logging.warning("There are more than on paragraphs in the article.")
+        body = ' '.join(body_values)
+    else:
+        body = body_values[0]
 
-def parse_journal_articles(input_dir: Union[Path, str]) -> Dict:
-     input_dir = Path(input_dir)
-     file_list = list(input_dir.glob("*.xml"))
-     meta_file_list = list(input_dir.glob("*.didl.xml"))
-     file_list = [item for item in file_list if item not in meta_file_list]
-     articles: List[Dict] = []
-
-
-     for file in file_list:
-         title, body = parse_raw_article(file)
-         articles.append({"title": title, "body":body})
-     return articles
+    return {"title": title, "body":body}
     
-def parse_meta_file(input_dir: Union[Path, str]) -> Dict:
-    input_dir = Path(input_dir)
-    meta_file_list = list(input_dir.glob("*.didl.xml"))
+
+def parse_meta_file(meta_fp: Union[Path, str]) -> Dict:
+    # input_dir = Path(input_dir)
+    # meta_file_list = list(input_dir.glob("*.didl.xml"))
     newsletter_metadata: List[Dict] = []
 
 
     try:
-        tree=et.parse(meta_file_list[0])
+        tree=et.parse(meta_fp)
         root=tree.getroot()
     except et.ParseError as e:
-        logging.error("Failed to parse the xml file:%s", e)
+        logging.error("Failed to parse the meta file:%s", e)
 
         
     title_values = [element.text for element in root.iter() if element.tag.endswith('title')]
@@ -185,8 +210,8 @@ def parse_meta_file(input_dir: Union[Path, str]) -> Dict:
 
 
     newsletter_metadata.append({
-        "title": title,
-          "language":language,
+            "title": title,
+            "language":language,
             "issue_number":issuenumber,
             "date": date,
             "identifier": identifier,
@@ -210,5 +235,7 @@ def parse_meta_file(input_dir: Union[Path, str]) -> Dict:
 if __name__ == "__main__":
     # print(parse_raw_article('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100/MMKB12_000002100_00022_text.xml'))
     # print(parse_journal_articles('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100'))
-    print(parse_meta_file('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100'))
+    # print(parse_meta_file('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100'))
+    x = parse_all_articles("../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100")
+    print(x)
     
