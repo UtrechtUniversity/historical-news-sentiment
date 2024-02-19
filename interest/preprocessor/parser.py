@@ -30,12 +30,17 @@ class NewsletterFile:
         # List of xml files excluded meta file
         article_file_list = [item for item in file_list if item not in meta_file_list]
 
-        articles: List[Dict] = []
+        # articles: List[Dict] = []
+        articles: dict[Dict] = {}
+        id = 0
+
 
 
         for file in article_file_list:
             article = self._parse_raw_article(file)
-            articles.append(article)
+            id += 1
+            articles[id] = article
+            # articles.append(article)
 
         newsletter_metadata= self._parse_meta_file(meta_file_list[0])
 
@@ -246,7 +251,12 @@ class NewsletterFile:
 
 if __name__ == "__main__":
     x = NewsletterFile(input_dir = '../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100', output_dir=' ')
-    print(x.parse_all_articles())
+    h = x.parse_all_articles()
+    # print(h.keys())
+    print(h['articles'][1])
+    # print(h['newsletter_metadata'])
+    # print(h['articles'][38]['title'])
+
     # print(x.input_dir)
 
     # # print(parse_raw_article('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100/MMKB12_000002100_00022_text.xml'))
