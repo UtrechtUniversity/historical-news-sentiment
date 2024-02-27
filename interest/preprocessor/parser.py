@@ -1,75 +1,90 @@
+
+import os
+import tarfile
+import gzip
 import json
-import lzma
-import re
-from collections import Counter, defaultdict
-from pathlib import Path
-from typing import List, Union, Dict, Optional
+import xml.etree.ElementTree as ET
+from typing import Dict, Union
 import logging
 
-import xml.etree.cElementTree as et
 
+class XMLExtractor:
+    def __init__(self, root_dir: str, output_dir: str):
+        self.root_dir = root_dir
+        self.output_dir = output_dir
 
-class NewsletterFile:
-    """ Class for parsing xml files to json """
+    def extract_xml_string(self) -> None:
+        for folder_name in os.listdir(self.root_dir):
+            folder_path = os.path.join(self.root_dir, folder_name)
+            if not os.path.isdir(folder_path):
+                continue
+            if not folder_name.isdigit():  # Exclude in_progress, manifests, and ocr_complete folders and log files
+                continue
+            self.process_folder(folder_name, folder_path)
 
-    def __init__(
-            self,
-            input_dir: Union[Path, str], 
-            output_dir: Union[Path, str]
-            ):
-             
-        self.input_dir = Path(input_dir)
-        self.output_dir = Path(output_dir)
+    def process_folder(self, folder_name: str, folder_path: str) -> None:
+        for tgz_filename in os.listdir(folder_path):
+            if not tgz_filename.endswith('.tgz'):
+                continue
+            tgz_file_path = os.path.join(folder_path, tgz_filename)
+            base_name = os.path.splitext(tgz_filename)[0]
+            output_folder = os.path.join(self.output_dir, folder_name)
+            os.makedirs(output_folder, exist_ok=True)
+            try:
+                with tarfile.open(tgz_file_path, "r:gz") as outer_tar:
+                    news_dict = self.process_tar(outer_tar)
+            except tarfile.TarError as e:
+                logging.error(f"Error extracting {tgz_filename}: {e}")
+                continue
+            output_file = os.path.join(output_folder, f"{base_name}.json")
+            self.save_as_json(news_dict, output_file)
 
-
-    def parse_all_articles(self) -> Dict:
-        
-        file_list = list(self.input_dir.glob("*.xml"))
-        # List of meta files
-        meta_file_list = list(self.input_dir.glob("*.didl.xml"))
-        # List of xml files excluded meta file
-        article_file_list = [item for item in file_list if item not in meta_file_list]
-
-        # articles: List[Dict] = []
-        articles: dict[Dict] = {}
+    def process_tar(self, outer_tar: tarfile.TarFile) -> Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]:
+        news_dict = {"newsletter_metadata": {}, "articles": {}}
+        articles: Dict[int, Dict[str, str]] = {}
         id = 0
+        for entry in outer_tar:
+            try:
+                if entry.name.endswith(".xml"):
+                    file = outer_tar.extractfile(entry)
+                    if file is not None:
+                        content = file.read()
+                        xml_content = content.decode('utf-8', 'ignore')
+                        article = self.extract_article(xml_content, entry.name)
+                        id += 1
+                        news_dict["articles"][id] = article
 
-
-
-        for file in article_file_list:
-            article = self._parse_raw_article(file)
-            id += 1
-            articles[id] = article
-            # articles.append(article)
-
-        newsletter_metadata= self._parse_meta_file(meta_file_list[0])
-
-        news_dict = {"newsletter_metadata": newsletter_metadata, "articles": articles}
+                elif entry.name.endswith(".gz"):
+                    gz_member = next(member for member in outer_tar.getmembers() if member.name.endswith('.gz'))
+                    with outer_tar.extractfile(gz_member) as gz_file:
+                        with gzip.open(gz_file, 'rt') as xml_file:
+                            xml_string = xml_file.read()
+                            newsletter_metadata = self.extract_meta(xml_string)
+                            news_dict["newsletter_metadata"] = newsletter_metadata
+                else:
+                    continue
+            except Exception as e:
+                logging.error(f"Error processing file {entry.name}: {e}")
         return news_dict
 
-    def _parse_raw_article(self, article_fp: Union[Path, str]) -> Dict:
-        """Parse a raw article file into a structured list
-
-        Arguments
-        ---------
-        article_input_fp: Union[Path, str]
-        Input file to process.
-
-        Returns
-        --------
-        articles: List[Dict]
-        A list of dictionaries, where each item is for one article and includes
-        the title and the body of article.
-        
-        """
+    @staticmethod
+    def save_as_json(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
         try:
-            tree = et.parse(article_fp)
-            root = tree.getroot()
-        except et.ParseError as e:
-            logging.error("Failed to parse the article file:%s", e)
+            with open(output_file, 'w') as json_file:
+                json.dump(data, json_file, indent=4)
+        except Exception as e:
+            logging.error(f"Error saving JSON to {output_file}: {e}")
+
+    @staticmethod
+    def extract_article(xml_content: str, file_name: str) -> Dict[str, str]:
+        try:
+            root = ET.fromstring(xml_content)
+        except ET.ParseError:
+            logging.error(f"Failed to parse XML from file: {file_name}")
+            return {}
 
         title_values = [element.text for element in root.iter() if element.tag.endswith('title')]
-        if len(title_values)>1:
+        if len(title_values) > 1:
             logging.warning("More than one titles are extracted for the article.")
         if not title_values:
             logging.warning("No title is extracted for the article.")
@@ -81,54 +96,52 @@ class NewsletterFile:
         if not body_values:
             logging.warning("No body is extracted.")
             body = None
-        if len(body_values)>1:
-            logging.warning("There are more than on paragraphs in the article.")
+        elif len(body_values) > 1:
+            logging.warning("There are more than one paragraphs in the article.")
             body = ' '.join(body_values)
         else:
             body = body_values[0]
 
-        return {"title": title, "body":body}
-        
+        return {"title": title, "body": body}
 
-    def _parse_meta_file(self, meta_fp: Union[Path, str]) -> Dict:
-
-        newsletter_metadata: List[Dict] = []
-
+    @staticmethod
+    def extract_meta(xml_string: str) -> Dict[str, Union[str, None]]:
+        newsletter_metadata: Dict[str, Union[str, None]] = {}
 
         try:
-            tree=et.parse(meta_fp)
-            root=tree.getroot()
-        except et.ParseError as e:
-            logging.error("Failed to parse the meta file:%s", e)
+            root = ET.fromstring(xml_string)
+        except ET.ParseError:
+            logging.error("Failed to parse XML from file")
+            return newsletter_metadata
 
-            
+        # Extracting metadata
         title_values = [element.text for element in root.iter() if element.tag.endswith('title')]
         if len(title_values)>1:
             logging.warning("More than one titles are extracted from metadata.")
         if not title_values:
             logging.warning("No title is extracted.")
-            title = None
+            newsletter_metadata['title'] = None
         else:
-            title = title_values[0]
+            newsletter_metadata['title'] = title_values[0]
 
         language_values = [element.text for element in root.iter() if element.tag.endswith('language')]
         if len(language_values)>1:
             logging.warning("More than one language are extracted from metadata.")
         if not language_values:
             logging.warning("No language is extracted.")
-            language = None
+            newsletter_metadata['language'] = None
         else:
-            language = language_values[0]
+            newsletter_metadata['language'] = language_values[0]
 
-        
+
         issuenumber_values = [element.text for element in root.iter() if element.tag.endswith('issuenumber')]
         if len(issuenumber_values)>1:
             logging.warning("More than one issuenumbers are extracted from metadata.")
         if not issuenumber_values:
             logging.warning("No issuenumber is extracted.")
-            issuenumber = None
+            newsletter_metadata['issuenumber'] = None
         else:
-            issuenumber = issuenumber_values[0]
+            newsletter_metadata['issuenumber'] = issuenumber_values[0]
 
 
         date_values = [element.text for element in root.iter() if element.tag.endswith('date')]
@@ -136,133 +149,101 @@ class NewsletterFile:
             logging.warning("More than one dates are extracted from metadata.")
         if not date_values:
             logging.warning("No date is extracted.")
-            date = None
+            newsletter_metadata['date'] = None
         else:
-            date = date_values[0]
+            newsletter_metadata['date'] = date_values[0]
 
         identifier_values = [element.text for element in root.iter() if element.tag.endswith('identifier')]
         if len(identifier_values)>1:
             logging.warning("More than one identifiers are extracted from metadata.")
         if not identifier_values:
             logging.warning("No identifier is extracted.")
-            identifier = None
+            newsletter_metadata['identifier'] = None
         else:
-            identifier = identifier_values[0]
+            newsletter_metadata['identifier'] = identifier_values[0]
 
         temporal_values = [element.text for element in root.iter() if element.tag.endswith('temporal')]
         if len(temporal_values)>1:
             logging.warning("More than one temporal are extracted from metadata.")
         if not temporal_values:
             logging.warning("No temporal is extracted.")
-            temporal = None
+            newsletter_metadata['temporal'] = None
         else:
-            temporal = temporal_values[0]
+            newsletter_metadata['temporal'] = temporal_values[0]
 
         recordRights_values = [element.text for element in root.iter() if element.tag.endswith('recordRights')]
         if len(recordRights_values)>1:
             logging.warning("More than one recordRights are extracted from metadata.")
         if not recordRights_values:
             logging.warning("No recordRights is extracted.")
-            recordRights = None
+            newsletter_metadata['recordRights'] = None
         else:
-            recordRights = recordRights_values[0]
+            newsletter_metadata['recordRights'] = recordRights_values[0]
 
         publisher_values = [element.text for element in root.iter() if element.tag.endswith('publisher')]
         if len(publisher_values)>1:
             logging.warning("More than one publisher are extracted from metadata.")
         if not publisher_values:
             logging.warning("No publisher is extracted.")
-            publisher = None
+            newsletter_metadata['publisher'] = None
         else:
-            publisher = publisher_values[0]
+            newsletter_metadata['publisher'] = publisher_values[0]
 
         spatial_values = [element.text for element in root.iter() if element.tag.endswith('spatial')]
         if len(spatial_values)>1:
             logging.warning("More than one spatial are extracted from metadata.")
         if not spatial_values:
             logging.warning("No spatial is extracted.")
-            spatial_1 = None
-            spatial_2 = None
+            newsletter_metadata['spatial_1'] = None
+            newsletter_metadata['spatial_2'] = None
         else:
-            spatial_1 = spatial_values[0]
-            spatial_2 = spatial_values[1]
+            newsletter_metadata['spatial_1'] = spatial_values[0]
+            newsletter_metadata['spatial_2'] = spatial_values[1]
 
         source_values = [element.text for element in root.iter() if element.tag.endswith('source')]
         if len(source_values)>1:
             logging.warning("More than one source are extracted from metadata.")
         if not source_values:
             logging.warning("No source is extracted.")
-            source = None
+            newsletter_metadata['source'] = None
         else:
-            source = source_values[1]
+            newsletter_metadata['source'] = source_values[1]
 
         recordIdentifier_values = [element.text for element in root.iter() if element.tag.endswith('recordIdentifier')]
         if len(recordIdentifier_values)>1:
             logging.warning("More than one recordIdentifier are extracted from metadata.")
         if not recordIdentifier_values:
             logging.warning("No recordIdentifier is extracted.")
-            recordIdentifier = None
+            newsletter_metadata['recordIdentifier'] = None
         else:
-            recordIdentifier = recordIdentifier_values[0]
+            newsletter_metadata['recordIdentifier'] = recordIdentifier_values[0]
 
         type_values = [element.text for element in root.iter() if element.tag.endswith('type')]
         if len(type_values)>1:
             logging.warning("More than one type are extracted from metadata.")
         if not type_values:
             logging.warning("No type is extracted.")
-            type = None
+            newsletter_metadata['type'] = None
         else:
-            type = type_values[0]
+            newsletter_metadata['type'] = type_values[0]
 
         isPartOf_values = [element.text for element in root.iter() if element.tag.endswith('isPartOf')]
         if len(isPartOf_values)>1:
             logging.warning("More than one isPartOf are extracted from metadata.")
         if not isPartOf_values:
             logging.warning("No isPartOf is extracted.")
-            isPartOf_1 = None
-            isPartOf_2 = None
+            newsletter_metadata['isPartOf_1'] = None
+            newsletter_metadata['isPartOf_2'] = None
         else:
-            isPartOf_1 = isPartOf_values[0]
-            isPartOf_2 = isPartOf_values[1]
+            newsletter_metadata['isPartOf_1'] = isPartOf_values[0]
+            newsletter_metadata['isPartOf_2'] = isPartOf_values[1]
 
-
-        newsletter_metadata.append({
-                "title": title,
-                "language":language,
-                "issue_number":issuenumber,
-                "date": date,
-                "identifier": identifier,
-                "temporal": temporal,
-                "recordRights": recordRights,
-                "publisher": publisher,
-                "spatial_1": spatial_1,
-                "spatial_2": spatial_2,
-                "source": source,
-                "recordIdentifier": recordIdentifier,
-                "type": type,
-                "isPartOf_1":isPartOf_1,
-                "isPartOf_2":isPartOf_2
-                })
-        
         return newsletter_metadata
 
+# Configure logging
+logging.basicConfig(filename='extractor.log', level=logging.DEBUG)
 
-    
-
+# Example usage
 if __name__ == "__main__":
-    x = NewsletterFile(input_dir = '../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100', output_dir=' ')
-    h = x.parse_all_articles()
-    # print(h.keys())
-    print(h['articles'][1])
-    # print(h['newsletter_metadata'])
-    # print(h['articles'][38]['title'])
-
-    # print(x.input_dir)
-
-    # # print(parse_raw_article('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100/MMKB12_000002100_00022_text.xml'))
-    # # print(parse_journal_articles('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100'))
-    # # print(parse_meta_file('../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100'))
-    # x = parse_all_articles("../../data/news/2022_harvest_KRANTEN/00/KRANTEN_KBPERS01_000002100")
-    # print(x)
-
-    
+    extractor = XMLExtractor("../../data/news/gg", "../../data/news/gg-json")
+    extractor.extract_xml_string()
