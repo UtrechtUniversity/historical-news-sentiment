@@ -186,130 +186,24 @@ class XMLExtractor:
             return newsletter_metadata
 
         # Extracting metadata
-        title_values = [element.text for element in root.iter() if element.tag.endswith('title')]
-        if len(title_values)>1:
-            logging.warning("More than one titles are extracted from metadata.")
-        if not title_values:
-            logging.warning("No title is extracted.")
-            newsletter_metadata['title'] = None
-        else:
-            newsletter_metadata['title'] = title_values[0]
+        fields = [
+            "title", "language", "issuenumber", "date", "identifier",
+            "temporal", "recordRights", "publisher", "spatial", "source",
+            "recordIdentifier", "type", "isPartOf"
+        ]
 
-        language_values = [element.text for element in root.iter() if element.tag.endswith('language')]
-        if len(language_values)>1:
-            logging.warning("More than one language are extracted from metadata.")
-        if not language_values:
-            logging.warning("No language is extracted.")
-            newsletter_metadata['language'] = None
-        else:
-            newsletter_metadata['language'] = language_values[0]
-
-
-        issuenumber_values = [element.text for element in root.iter() if element.tag.endswith('issuenumber')]
-        if len(issuenumber_values)>1:
-            logging.warning("More than one issuenumbers are extracted from metadata.")
-        if not issuenumber_values:
-            logging.warning("No issuenumber is extracted.")
-            newsletter_metadata['issuenumber'] = None
-        else:
-            newsletter_metadata['issuenumber'] = issuenumber_values[0]
-
-
-        date_values = [element.text for element in root.iter() if element.tag.endswith('date')]
-        if len(date_values)>1:
-            logging.warning("More than one dates are extracted from metadata.")
-        if not date_values:
-            logging.warning("No date is extracted.")
-            newsletter_metadata['date'] = None
-        else:
-            newsletter_metadata['date'] = date_values[0]
-
-        identifier_values = [element.text for element in root.iter() if element.tag.endswith('identifier')]
-        if len(identifier_values)>1:
-            logging.warning("More than one identifiers are extracted from metadata.")
-        if not identifier_values:
-            logging.warning("No identifier is extracted.")
-            newsletter_metadata['identifier'] = None
-        else:
-            newsletter_metadata['identifier'] = identifier_values[0]
-
-        temporal_values = [element.text for element in root.iter() if element.tag.endswith('temporal')]
-        if len(temporal_values)>1:
-            logging.warning("More than one temporal are extracted from metadata.")
-        if not temporal_values:
-            logging.warning("No temporal is extracted.")
-            newsletter_metadata['temporal'] = None
-        else:
-            newsletter_metadata['temporal'] = temporal_values[0]
-
-        recordRights_values = [element.text for element in root.iter() if element.tag.endswith('recordRights')]
-        if len(recordRights_values)>1:
-            logging.warning("More than one recordRights are extracted from metadata.")
-        if not recordRights_values:
-            logging.warning("No recordRights is extracted.")
-            newsletter_metadata['recordRights'] = None
-        else:
-            newsletter_metadata['recordRights'] = recordRights_values[0]
-
-        publisher_values = [element.text for element in root.iter() if element.tag.endswith('publisher')]
-        if len(publisher_values)>1:
-            logging.warning("More than one publisher are extracted from metadata.")
-        if not publisher_values:
-            logging.warning("No publisher is extracted.")
-            newsletter_metadata['publisher'] = None
-        else:
-            newsletter_metadata['publisher'] = publisher_values[0]
-
-        spatial_values = [element.text for element in root.iter() if element.tag.endswith('spatial')]
-        if len(spatial_values)>1:
-            logging.warning("More than one spatial are extracted from metadata.")
-        if not spatial_values:
-            logging.warning("No spatial is extracted.")
-            newsletter_metadata['spatial_1'] = None
-            newsletter_metadata['spatial_2'] = None
-        else:
-            newsletter_metadata['spatial_1'] = spatial_values[0]
-            newsletter_metadata['spatial_2'] = spatial_values[1]
-
-        source_values = [element.text for element in root.iter() if element.tag.endswith('source')]
-        if len(source_values)>1:
-            logging.warning("More than one source are extracted from metadata.")
-        if not source_values:
-            logging.warning("No source is extracted.")
-            newsletter_metadata['source'] = None
-        else:
-            newsletter_metadata['source'] = source_values[1]
-
-        recordIdentifier_values = [element.text for element in root.iter() if element.tag.endswith('recordIdentifier')]
-        if len(recordIdentifier_values)>1:
-            logging.warning("More than one recordIdentifier are extracted from metadata.")
-        if not recordIdentifier_values:
-            logging.warning("No recordIdentifier is extracted.")
-            newsletter_metadata['recordIdentifier'] = None
-        else:
-            newsletter_metadata['recordIdentifier'] = recordIdentifier_values[0]
-
-        type_values = [element.text for element in root.iter() if element.tag.endswith('type')]
-        if len(type_values)>1:
-            logging.warning("More than one type are extracted from metadata.")
-        if not type_values:
-            logging.warning("No type is extracted.")
-            newsletter_metadata['type'] = None
-        else:
-            newsletter_metadata['type'] = type_values[0]
-
-        isPartOf_values = [element.text for element in root.iter() if element.tag.endswith('isPartOf')]
-        if len(isPartOf_values)>1:
-            logging.warning("More than one isPartOf are extracted from metadata.")
-        if not isPartOf_values:
-            logging.warning("No isPartOf is extracted.")
-            newsletter_metadata['isPartOf_1'] = None
-            newsletter_metadata['isPartOf_2'] = None
-        else:
-            newsletter_metadata['isPartOf_1'] = isPartOf_values[0]
-            newsletter_metadata['isPartOf_2'] = isPartOf_values[1]
+        for field in fields:
+            field_values = [element.text for element in root.iter() if element.tag.endswith(field)]
+            if len(field_values) > 1:
+                logging.warning(f"More than one {field}s are extracted from metadata.")
+            if not field_values:
+                logging.warning(f"No {field} is extracted.")
+                newsletter_metadata[field] = None
+            else:
+                newsletter_metadata[field] = field_values[0] if field != "spatial" else ", ".join(field_values)
 
         return newsletter_metadata
+
 
 # Configure logging
 logging.basicConfig(filename='extractor.log', level=logging.DEBUG)
