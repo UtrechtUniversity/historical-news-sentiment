@@ -8,29 +8,28 @@ from typing import Dict, Union
 import logging
 
 
-
 class XMLExtractor:
-    """Class for extracting XML content and metadata from nested .tgz files."""
+    """Class for extracting XML content and metadata from nested .tgz files."""  # noqa: E501
     def __init__(self, root_dir: str, output_dir: str):
         """
         Initializes the XMLExtractor object.
 
         Parameters:
             root_dir (str): The root directory containing .tgz files.
-            output_dir (str): The output directory for saving extracted JSON files.
+            output_dir (str): The output directory for saving extracted JSON files.  # noqa: E501
         """
         self.root_dir = root_dir
         self.output_dir = output_dir
 
     def extract_xml_string(self) -> None:
         """
-        Extracts XML content and metadata from .tgz files in the root directory.
+        Extracts XML content and metadata from .tgz files in the root directory.  # noqa: E501
         """
         for folder_name in os.listdir(self.root_dir):
             folder_path = os.path.join(self.root_dir, folder_name)
             if not os.path.isdir(folder_path):
                 continue
-            if not folder_name.isdigit():  # Exclude in_progress, manifests, and ocr_complete folders and log files
+            if not folder_name.isdigit():  # Exclude in_progress, manifests, and ocr_complete folders and log files.  # noqa: E501
                 continue
             self.process_folder(folder_name, folder_path)
 
@@ -59,7 +58,7 @@ class XMLExtractor:
             self.save_as_json_compressed(news_dict, output_file)
             # self.save_as_json(news_dict, output_file)
 
-    def process_tar(self, outer_tar: tarfile.TarFile) -> Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]:
+    def process_tar(self, outer_tar: tarfile.TarFile) -> Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]:  # noqa: E501
         """
         Processes a .tgz file and extracts XML content and metadata.
 
@@ -67,10 +66,9 @@ class XMLExtractor:
             outer_tar (tarfile.TarFile): The .tgz file being processed.
 
         Returns:
-            Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]: A dictionary containing extracted content and metadata.
+            Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]: A dictionary containing extracted content and metadata.  # noqa: E501
         """
         news_dict = {"newsletter_metadata": {}, "articles": {}}
-        articles: Dict[int, Dict[str, str]] = {}
         id = 0
         for entry in outer_tar:
             try:
@@ -84,41 +82,40 @@ class XMLExtractor:
                         news_dict["articles"][id] = article
 
                 elif entry.name.endswith(".gz"):
-                    gz_member = next(member for member in outer_tar.getmembers() if member.name.endswith('.gz'))
+                    gz_member = next(member for member in outer_tar.getmembers() if member.name.endswith('.gz'))  # noqa: E501
                     with outer_tar.extractfile(gz_member) as gz_file:
                         with gzip.open(gz_file, 'rt') as xml_file:
                             xml_string = xml_file.read()
                             newsletter_metadata = self.extract_meta(xml_string)
-                            news_dict["newsletter_metadata"] = newsletter_metadata
+                            news_dict["newsletter_metadata"] = newsletter_metadata  # noqa: E501
                 else:
                     continue
             except Exception as e:
                 logging.error(f"Error processing file {entry.name}: {e}")
         return news_dict
-    
+
     @staticmethod
-    def save_as_json_compressed(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
+    def save_as_json_compressed(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:  # noqa: E501
         """
         Saves data as compressed JSON using gzip.
 
         Parameters:
-            data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.
+            data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.  # noqa: E501
             output_file (str): Path to the output JSON file.
         """
         try:
             with gzip.open(output_file, 'wt') as json_file:
                 json.dump(data, json_file, indent=4)
         except Exception as e:
-            logging.error(f"Error saving compressed JSON to {output_file}: {e}")
-
+            logging.error(f"Error saving compressed JSON to {output_file}: {e}")  # noqa: E501
 
     # @staticmethod
-    # def save_as_json(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
+    # def save_as_json(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:  # noqa: E501
     #     """
     #     Saves data as JSON to a specified file.
 
     #     Parameters:
-    #         data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.
+    #         data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.  # noqa: E501
     #         output_file (str): Path to the output JSON file.
     #     """
     #     try:
@@ -137,7 +134,7 @@ class XMLExtractor:
             file_name (str): Name of the XML file.
 
         Returns:
-            Dict[str, str]: A dictionary containing the extracted title and body of the article.
+            Dict[str, str]: A dictionary containing the extracted title and body of the article.  # noqa: E501
         """
         try:
             root = ET.fromstring(xml_content)
@@ -145,21 +142,21 @@ class XMLExtractor:
             logging.error(f"Failed to parse XML from file: {file_name}")
             return {}
 
-        title_values = [element.text for element in root.iter() if element.tag.endswith('title')]
+        title_values = [element.text for element in root.iter() if element.tag.endswith('title')]  # noqa: E501
         if len(title_values) > 1:
-            logging.warning("More than one titles are extracted for the article.")
+            logging.warning("More than one titles are extracted for the article.")  # noqa: E501
         if not title_values:
             logging.warning("No title is extracted for the article.")
             title = None
         else:
             title = title_values[0]
 
-        body_values = [element.text for element in root.iter() if element.tag.endswith('p')]
+        body_values = [element.text for element in root.iter() if element.tag.endswith('p')]  # noqa: E501
         if not body_values:
             logging.warning("No body is extracted.")
             body = None
         elif len(body_values) > 1:
-            logging.warning("There are more than one paragraphs in the article.")
+            logging.warning("There are more than one paragraphs in the article.")  # noqa: E501
             body = ' '.join(body_values)
         else:
             body = body_values[0]
@@ -175,7 +172,7 @@ class XMLExtractor:
             xml_string (str): XML string containing metadata.
 
         Returns:
-            Dict[str, Union[str, None]]: A dictionary containing the extracted metadata.
+            Dict[str, Union[str, None]]: A dictionary containing the extracted metadata.  # noqa: E501
         """
         newsletter_metadata: Dict[str, Union[str, None]] = {}
 
@@ -193,14 +190,14 @@ class XMLExtractor:
         ]
 
         for field in fields:
-            field_values = [element.text for element in root.iter() if element.tag.endswith(field)]
+            field_values = [element.text for element in root.iter() if element.tag.endswith(field)]  # noqa: E501
             if len(field_values) > 1:
-                logging.warning(f"More than one {field}s are extracted from metadata.")
+                logging.warning(f"More than one {field}s are extracted from metadata.")  # noqa: E501
             if not field_values:
                 logging.warning(f"No {field} is extracted.")
                 newsletter_metadata[field] = None
             else:
-                newsletter_metadata[field] = field_values[0] if field != "spatial" else ", ".join(field_values)
+                newsletter_metadata[field] = field_values[0] if field != "spatial" else ", ".join(field_values)  # noqa: E501
 
         return newsletter_metadata
 
@@ -210,5 +207,7 @@ logging.basicConfig(filename='extractor.log', level=logging.DEBUG)
 
 # Example usage
 if __name__ == "__main__":
-    extractor = XMLExtractor("../../data/news/gg", "../../data/news/gg-json-compress")
+    input_dir = "../../data/news/gg"
+    output_dir = "../../data/news/gg-json-compress"
+    extractor = XMLExtractor(input_dir, output_dir)
     extractor.extract_xml_string()
