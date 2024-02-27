@@ -8,6 +8,7 @@ from typing import Dict, Union
 import logging
 
 
+
 class XMLExtractor:
     """Class for extracting XML content and metadata from nested .tgz files."""
     def __init__(self, root_dir: str, output_dir: str):
@@ -55,7 +56,8 @@ class XMLExtractor:
                 logging.error(f"Error extracting {tgz_filename}: {e}")
                 continue
             output_file = os.path.join(output_folder, f"{base_name}.json")
-            self.save_as_json(news_dict, output_file)
+            self.save_as_json_compressed(news_dict, output_file)
+            # self.save_as_json(news_dict, output_file)
 
     def process_tar(self, outer_tar: tarfile.TarFile) -> Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]:
         """
@@ -93,21 +95,37 @@ class XMLExtractor:
             except Exception as e:
                 logging.error(f"Error processing file {entry.name}: {e}")
         return news_dict
-
+    
     @staticmethod
-    def save_as_json(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
+    def save_as_json_compressed(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
         """
-        Saves data as JSON to a specified file.
+        Saves data as compressed JSON using gzip.
 
         Parameters:
             data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.
             output_file (str): Path to the output JSON file.
         """
         try:
-            with open(output_file, 'w') as json_file:
+            with gzip.open(output_file, 'wt') as json_file:
                 json.dump(data, json_file, indent=4)
         except Exception as e:
-            logging.error(f"Error saving JSON to {output_file}: {e}")
+            logging.error(f"Error saving compressed JSON to {output_file}: {e}")
+
+
+    # @staticmethod
+    # def save_as_json(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
+    #     """
+    #     Saves data as JSON to a specified file.
+
+    #     Parameters:
+    #         data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.
+    #         output_file (str): Path to the output JSON file.
+    #     """
+    #     try:
+    #         with open(output_file, 'w') as json_file:
+    #             json.dump(data, json_file, indent=4)
+    #     except Exception as e:
+    #         logging.error(f"Error saving JSON to {output_file}: {e}")
 
     @staticmethod
     def extract_article(xml_content: str, file_name: str) -> Dict[str, str]:
@@ -298,5 +316,5 @@ logging.basicConfig(filename='extractor.log', level=logging.DEBUG)
 
 # Example usage
 if __name__ == "__main__":
-    extractor = XMLExtractor("../../data/news/gg", "../../data/news/gg-json")
+    extractor = XMLExtractor("../../data/news/gg", "../../data/news/gg-json-compress")
     extractor.extract_xml_string()
