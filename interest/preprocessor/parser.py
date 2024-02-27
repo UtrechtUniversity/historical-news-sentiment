@@ -9,11 +9,22 @@ import logging
 
 
 class XMLExtractor:
+    """Class for extracting XML content and metadata from nested .tgz files."""
     def __init__(self, root_dir: str, output_dir: str):
+        """
+        Initializes the XMLExtractor object.
+
+        Parameters:
+            root_dir (str): The root directory containing .tgz files.
+            output_dir (str): The output directory for saving extracted JSON files.
+        """
         self.root_dir = root_dir
         self.output_dir = output_dir
 
     def extract_xml_string(self) -> None:
+        """
+        Extracts XML content and metadata from .tgz files in the root directory.
+        """
         for folder_name in os.listdir(self.root_dir):
             folder_path = os.path.join(self.root_dir, folder_name)
             if not os.path.isdir(folder_path):
@@ -23,6 +34,13 @@ class XMLExtractor:
             self.process_folder(folder_name, folder_path)
 
     def process_folder(self, folder_name: str, folder_path: str) -> None:
+        """
+        Processes .tgz files within a folder.
+
+        Parameters:
+            folder_name (str): Name of the folder being processed.
+            folder_path (str): Path to the folder being processed.
+        """
         for tgz_filename in os.listdir(folder_path):
             if not tgz_filename.endswith('.tgz'):
                 continue
@@ -40,6 +58,15 @@ class XMLExtractor:
             self.save_as_json(news_dict, output_file)
 
     def process_tar(self, outer_tar: tarfile.TarFile) -> Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]:
+        """
+        Processes a .tgz file and extracts XML content and metadata.
+
+        Parameters:
+            outer_tar (tarfile.TarFile): The .tgz file being processed.
+
+        Returns:
+            Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]: A dictionary containing extracted content and metadata.
+        """
         news_dict = {"newsletter_metadata": {}, "articles": {}}
         articles: Dict[int, Dict[str, str]] = {}
         id = 0
@@ -69,6 +96,13 @@ class XMLExtractor:
 
     @staticmethod
     def save_as_json(data: Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]], output_file: str) -> None:
+        """
+        Saves data as JSON to a specified file.
+
+        Parameters:
+            data (Dict[str, Union[Dict[str, str], Dict[int, Dict[str, str]]]]): Data to be saved as JSON.
+            output_file (str): Path to the output JSON file.
+        """
         try:
             with open(output_file, 'w') as json_file:
                 json.dump(data, json_file, indent=4)
@@ -77,6 +111,16 @@ class XMLExtractor:
 
     @staticmethod
     def extract_article(xml_content: str, file_name: str) -> Dict[str, str]:
+        """
+        Extracts article title and body from XML content.
+
+        Parameters:
+            xml_content (str): XML content of the article.
+            file_name (str): Name of the XML file.
+
+        Returns:
+            Dict[str, str]: A dictionary containing the extracted title and body of the article.
+        """
         try:
             root = ET.fromstring(xml_content)
         except ET.ParseError:
@@ -106,6 +150,15 @@ class XMLExtractor:
 
     @staticmethod
     def extract_meta(xml_string: str) -> Dict[str, Union[str, None]]:
+        """
+        Extracts metadata from XML string.
+
+        Parameters:
+            xml_string (str): XML string containing metadata.
+
+        Returns:
+            Dict[str, Union[str, None]]: A dictionary containing the extracted metadata.
+        """
         newsletter_metadata: Dict[str, Union[str, None]] = {}
 
         try:
