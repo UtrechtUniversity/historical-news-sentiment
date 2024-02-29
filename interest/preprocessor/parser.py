@@ -7,7 +7,6 @@ import xml.etree.ElementTree as ET
 from typing import Dict, Union
 import logging
 
-
 class XMLExtractor:
     """Class for extracting XML content and metadata from nested .tgz files."""  # noqa: E501
     def __init__(self, root_dir: str, output_dir: str):
@@ -155,11 +154,12 @@ class XMLExtractor:
         if not body_values:
             logging.warning("No body is extracted.")
             body = None
-        elif len(body_values) > 1:
-            logging.warning("There are more than one paragraphs in the article.")  # noqa: E501
-            body = ' '.join(body_values)
+        # elif len(body_values) > 1:
+        #     logging.warning("There are more than one paragraphs in the article.")  # noqa: E501
+        #     body = ' '.join(body_values)
         else:
-            body = body_values[0]
+            # body = body_values[0]
+            body = body_values
 
         return {"title": title, "body": body}
 
