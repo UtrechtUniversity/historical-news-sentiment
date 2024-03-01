@@ -7,6 +7,7 @@ import xml.etree.ElementTree as ET
 from typing import Dict, Union
 import logging
 
+
 class XMLExtractor:
     """Class for extracting XML content and metadata from nested .tgz files."""  # noqa: E501
     def __init__(self, root_dir: str, output_dir: str):
@@ -200,14 +201,4 @@ class XMLExtractor:
                 newsletter_metadata[field] = field_values[0] if field != "spatial" else ", ".join(field_values)  # noqa: E501
 
         return newsletter_metadata
-
-
-# Configure logging
-logging.basicConfig(filename='extractor.log', level=logging.DEBUG)
-
-# Example usage
-if __name__ == "__main__":
-    input_dir = "../../data/news/gg"
-    output_dir = "../../data/news/gg-json-compress"
-    extractor = XMLExtractor(input_dir, output_dir)
-    extractor.extract_xml_string()
+ 
