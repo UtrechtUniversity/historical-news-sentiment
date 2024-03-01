@@ -4,7 +4,7 @@ from pathlib import Path
 import logging
 
 
-logging.basicConfig(filename='logs/extractor.log', level=logging.DEBUG)
+logging.basicConfig(filename='extractor.log', level=logging.DEBUG)
 
 
 
