@@ -20,6 +20,11 @@ class XMLExtractor:
         """
         self.root_dir = root_dir
         self.output_dir = output_dir
+        self.fields = [
+            "title", "language", "issuenumber", "date", "identifier",
+            "temporal", "recordRights", "publisher", "spatial", "source",
+            "recordIdentifier", "type", "isPartOf"
+        ]
 
     def extract_xml_string(self) -> None:
         """
@@ -164,8 +169,7 @@ class XMLExtractor:
 
         return {"title": title, "body": body}
 
-    @staticmethod
-    def extract_meta(xml_string: str) -> Dict[str, Union[str, None]]:
+    def extract_meta(self,xml_string: str) -> Dict[str, Union[str, None]]:
         """
         Extracts metadata from XML string.
 
@@ -183,14 +187,7 @@ class XMLExtractor:
             logging.error("Failed to parse XML from file")
             return newsletter_metadata
 
-        # Extracting metadata
-        fields = [
-            "title", "language", "issuenumber", "date", "identifier",
-            "temporal", "recordRights", "publisher", "spatial", "source",
-            "recordIdentifier", "type", "isPartOf"
-        ]
-
-        for field in fields:
+        for field in self.fields:
             field_values = [element.text for element in root.iter() if element.tag.endswith(field)]  # noqa: E501
             if len(field_values) > 1:
                 logging.warning(f"More than one {field}s are extracted from metadata.")  # noqa: E501
