@@ -5,12 +5,11 @@ This module provides an abstract class for representing various input files.
 
 import abc
 import gzip
+import logging
 from pathlib import Path
 from typing import Iterable, TextIO, cast, Optional
 from interest.document import Document, Article
-import logging
-
-# from .document_filter import DocumentFilter
+from interest.document_filter import DocumentFilter
 
 
 class InputFile(abc.ABC):
@@ -110,10 +109,11 @@ class InputFile(abc.ABC):
         """
         return NotImplemented
 
-    # def selected_articles(self, filter: DocumentFilter) -> Iterable[Article]:
-    #     document = self.doc()
-    #     if filter.filter_document(document):
-    #         if document.articles() is not None:
-    #             for article in document.articles():
-    #                 if filter.filter_article(article):
-    #                     yield article
+    def selected_articles(self, filter: DocumentFilter) -> Iterable[Article]:
+        document = self.doc()
+        if document is not None:
+            if filter.filter_document(document):
+                if document.articles is not None:
+                    for article in document.articles:
+                        if filter.filter_article(article):
+                            yield article
