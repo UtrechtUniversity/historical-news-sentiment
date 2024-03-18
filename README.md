@@ -205,6 +205,7 @@ python3 scripts/step4_generate_output.py --input_dir "output/output_timestamped/
 
 Pim Huijnen (p.huijnen@uu.nl)
 
+
 **Research Software Engineer(s)**:
 
 - Parisa Zahedi (p.zahedi@uu.nl)
@@ -233,3 +234,4 @@ To contribute:
 Pim Huijnen - p.huijnen@uu.nl
 
 Project Link: [https://github.com/UtrechtUniversity/historical-news-sentiment](https://github.com/UtrechtUniversity/historical-news-sentiment)
+
