@@ -8,9 +8,12 @@ from functools import cache
 import json
 import spacy
 import spacy.cli
-from interest.document_filter import YearFilter, TitleFilter, DocumentFilter
-from interest.document_filter import (CompoundFilter, DecadeFilter,
-                                      KeywordsFilter)
+from interest.filter.document_filter import (YearFilter,
+                                             TitleFilter,
+                                             DocumentFilter)
+from interest.filter.document_filter import (CompoundFilter,
+                                             DecadeFilter,
+                                             KeywordsFilter)
 from interest.settings import ENCODING
 
 
@@ -121,6 +124,34 @@ def get_article_selector_from_config(config_file: Path) -> dict:
     try:
         with open(config_file, 'r', encoding=ENCODING) as f:
             config: Dict[str, str] = json.load(f)["article_selector"]
+        if not config:
+            raise ValueError("Config is empty")
+        return config
+    except FileNotFoundError as exc:
+        raise FileNotFoundError("Config file not found") from exc
+    except KeyError as exc:
+        raise KeyError("Article selector not found in config file") \
+            from exc
+
+
+def get_output_unit_from_config(config_file: Path) -> dict:
+    """
+        Get the article selector configuration from a JSON file.
+
+        Args:
+            config_file (Path): The path to the JSON config file.
+
+        Returns:
+            Dict[str, str]: The article selector configuration.
+
+        Raises:
+            ArticleSelectorNotFoundError: If the article selector
+            is not found in the config file.
+            FileNotFoundError: If the config file is not found.
+    """
+    try:
+        with open(config_file, 'r', encoding=ENCODING) as f:
+            config: Dict[str, str] = json.load(f)["output_unit"]
         if not config:
             raise ValueError("Config is empty")
         return config
