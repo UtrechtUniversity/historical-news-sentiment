@@ -1,51 +1,235 @@
-# re-python-package
+# INTEREST
 
-This template repository is created by the [UU Research Engineering team](https://utrechtuniversity.github.io/research-engineering/) and is aimed to provide a simple project template for python package development.
+The code in this repository implements a pipeline to extract specific articles from a large corpus.
 
-The template includes:
-- Project directory structure
-- Project configuration using `pyproject.toml`
-- GitHub actions workflows for testing, linting, type checking and publishing on pypi
+Currently, this tool is tailored for the [Delpher Kranten](https://www.delpher.nl/nl/kranten) corpus, but it can be adapted for other corpora as well.
 
-Many other project templates exist, check for example this advanced [python template](https://github.com/NLeSC/python-template) by the NL eScience Center.
+Articles can be filtered based on individual or multiple features such as title, year, decade, or a set of keywords. To select the most relevant articles, we utilize models such as tf-idf. These models are configurable and extendable.
 
-## Dependencies
-This template uses:
-| Tool | Aim |
-| --- | --- |
-| setuptools | building |
-| flake8, pylint | code linting |
-| pytest | testing |
-| pydocstyle | checking docstrings |
-| mypy | type checking |
-| sphinx | documentation generation |
 
-If needed, most of these tools can be removed by simply removing the GitHub action that calls the tool, or by changing `pyproject.toml`
+## Getting Started
+Clone this repository to your working station to obtain examples and python scripts:
+```
+git clone https://github.com/UtrechtUniversity/historical-news-sentiment.git
+```
 
-## How to use
+### Prerequisites
+To install and run this project you need to have the following prerequisites installed.
+```
+- Python [>=3.9, <3.11]
+```
 
-### Step 1: Create new repository from this template
-Click `Use this template` at the top of this page to create a new repository using this template
+### Installation
+#### Option 1 - Install interest package
+To run the project, ensure to install the interest package that is part of this project.
+```
+pip install interest
+```
+#### Option 2 - Run from source code
+If you want to run the scripts without installation you need to:  
 
-### Step 2: Change the name of your package in pyproject.toml
-- Change the name of the folder `package-name` to the name of your package
-- Open `pyproject.toml` and change `package-name` to the name of your package
-- Also change the authors and optionally any other items that you want to change
+- Install requirement
+```commandline
+pip install setuptools wheel
+```
+Change your current working directory to the location of your pyproject.toml file.
+```
+python -m build
+pip install .
+```
+- Set PYTHONPATH environment: 
+On Linux and Mac OS, you might have to set the PYTHONPATH environment variable to point to this directory.
 
-### Step 3: Change GitHub Actions workflow
-- Open `.github/workflows/python-package.yml`
-- Change `package-name` to the name of your package (line 21)
-- Many actions are commented out, uncomment them when you want to start using them.
+```commandline
+export PYTHONPATH="current working directory/historical-news-sentiment:${PYTHONPATH}"
+```
+### Built with
+These packages are automatically installed in the step above:
+* [scikit-learn](https://scikit-learn.org/stable/)
+* [SciPy](https://scipy.org)
+* [NumPy](https://numpy.org)
+* [spaCy](https://spacy.io)
+* [pandas](https://pandas.pydata.org)
 
-### Step 4: Replace this README file with your README
-- You may use this [README template](https://github.com/UtrechtUniversity/rse-project-templates/blob/master/README-template.md)
+## Usage
+### 1. Preparation
+#### Data Prepration
+Before proceeding, ensure that you have the data prepared in the following format: The expected format is a set of JSON files compressed in the .gz format. Each JSON file contains metadata related to a newsletter, magazine, etc., as well as a list of article titles and their corresponding bodies. These files may be organized within different folders or sub-folders.
+Below is a snapshot of the JSON file format:
+```commandline
+{
+    "newsletter_metadata": {
+        "title": "Newspaper title ..",
+        "language": "NL",
+        "date": "1878-04-29",
+        ...
+    },
+    "articles": {
+        "1": {
+            "title": "title of article1 ",
+            "body": [
+                "paragraph 1 ....",
+                "paragraph 2...."
+            ]
+        },
+        "2": {
+            "title": "title of article2",
+            "body": [
+                "text..."  
+             ]
+        }
+    }
+}    
+```
 
-### Step 5: Change the license file
-- Open `LICENSE`, change the copyright holder when required (line 3)
-- Or replace the entire license file if another license applies
+In our use case, the harvested KB data is in XML format. We have provided the following script to transform the original data into the expected format.
+```
+from interest.preprocessor.parser import XMLExtractor
 
-### Step 6: Add a citation file
-- Create a citation file for your repository using [cffinit](https://citation-file-format.github.io/cff-initializer-javascript/#/)
+extractor = XMLExtractor(Path(input_dir), Path(output_dir))
+extractor.extract_xml_string()
+```
 
-### Step 7: Publising on Pypi (optional/later)
-For publishing the package on Pypi you need to create [API tokens](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries).
+Navigate to scripts folder and run:
+```
+python3 convert_input_files.py --input_dir path/to/raw/xml/data --output_dir path/to/converted/json/compressed/output
+```
+#### Customize input-file
+
+In order to define a corpus with a new data format you should:
+
+- add a new input_file_type to [INPUT_FILE_TYPES](https://github.com/UtrechtUniversity/historical-news-sentiment/blob/main/interest/filter/__init__.py)
+- implement a class that inherits from [input_file.py](https://github.com/UtrechtUniversity/historical-news-sentiment/blob/main/interest/filter/input_file.py).
+This class is customized to read a new data format. In our case-study we defined [delpher_kranten.py](https://github.com/UtrechtUniversity/historical-news-sentiment/blob/main/interest/filter/delpher_kranten.py).
+
+
+### 2. Filtering
+In this step, you may select articles based on a filter or a collection of filters. Articles can be filtered by title, year, decade, or a set of keywords defined in the ```config.json``` file.
+```commandline
+ "filters": [
+     {
+       "type": "TitleFilter",
+       "title": "example"
+     },
+     {
+       "type": "YearFilter",
+       "year": 2022
+     },
+     {
+       "type": "DecadeFilter",
+       "decade": 1960
+     },
+     {
+       "type": "KeywordsFilter",
+       "keywords": ["sustainability", "green"]
+     }
+   ]
+ }
+
+```
+run the following to filter the articles:
+```commandline
+python3 scripts/step1_filter_articles.py --input-dir "path/to/converted/json/compressed/output/" --output-dir "output_filter/" --input-type "delpher_kranten" --glob "*.gz"
+```
+In our case, input-type is "delpher_kranten", and input data is a set of compresed json files with ```.gz``` extension.
+
+The output of this script is a JSON file for each selected article in the following format:
+```commandline
+{
+    "file_path": "output/transfered_data/00/KRANTEN_KBPERS01_000002100.json.gz",
+    "article_id": "5",
+    "Date": "1878-04-29",
+    "Title": "Opregte Haarlemsche Courant"
+}
+```
+### 3. Categorization by timestamp
+The output files generated in the previous step are categorized based on a specified [period-type](https://github.com/UtrechtUniversity/historical-news-sentiment/blob/main/interest/temporal_categorization/__init__.py), 
+such as ```year``` or ```decade```. This categorization is essential for subsequent steps, especially if you intend to apply tf-idf or other models to specific periods. In our case, we applied tf-idf per decade.
+
+```commandline
+python3 scripts/step2_categorize_by_timestamp.py --input-dir "output_filter/" --glob "*.json" --period-type "decade"  --output-dir "output_timestamped/"
+
+```
+The output consists of a .csv file for each period, such as one file per decade, containing the ```file_path``` and ```article_id``` of selected articles.
+
+### 4. Select final articles
+This step is applicable when articles are filtered (in step 2) using a set of keywords. 
+By utilizing tf-idf, the most relevant articles related to the specified topic (defined by the provided keywords) are selected.
+
+Before applying tf-idf, articles containing any of the specified keywords in their title are selected.
+
+From the rest of articles, to choose the most relevant ones, you can specify one of the following criteria in [config.py](https://github.com/UtrechtUniversity/historical-news-sentiment/blob/main/config.json):
+
+- Threshold for the tf-idf score value
+- Maximum number of selected articles with the top scores
+
+```commandline
+"article_selector":
+    {
+      "type": "threshold",
+      "value": "0.02"
+    },
+    
+    OR
+    
+   "article_selector":
+    {
+      "type": "num_articles",
+      "value": "200"
+    }, 
+```
+
+The following script, add a new column, ```selected``` to the .csv files from the previous step.
+```commandline
+python3 scripts/3_select_final_articles.py --input_dir "output/output_timestamped/"
+```
+
+### 5. Generate output
+As the final step of the pipeline, the text of the selected articles is saved in a .csv file, which can be used for manual labeling. The user has the option to choose whether the text should be divided into paragraphs.
+This feature can be set in [config.py](https://github.com/UtrechtUniversity/historical-news-sentiment/blob/main/config.json).
+```commandline
+"output_unit": "paragraph"
+
+OR
+
+"output_unit": "text"
+```
+
+```commandline
+python3 scripts/step4_generate_output.py --input_dir "output/output_timestamped/” --output-dir “output/output_results/“  --glob “*.csv”
+```
+## About the Project
+**Date**: February 2024
+
+**Researcher(s)**:
+
+Pim Huijnen (p.huijnen@uu.nl)
+
+**Research Software Engineer(s)**:
+
+- Parisa Zahedi (p.zahedi@uu.nl)
+- Shiva Nadi (s.nadi@uu.nl)
+- Matty Vermet (m.s.vermet@uu.nl)
+
+
+### License
+
+The code in this project is released under [MIT license](LICENSE).
+
+## Contributing
+
+Contributions are what make the open source community an amazing place to learn, inspire, and create. Any contributions you make are **greatly appreciated**.
+
+To contribute:
+
+1. Fork the Project
+2. Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3. Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4. Push to the Branch (`git push origin feature/AmazingFeature`)
+5. Open a Pull Request
+
+## Contact
+
+Pim Huijnen - p.huijnen@uu.nl
+
+Project Link: [https://github.com/UtrechtUniversity/historical-news-sentiment](https://github.com/UtrechtUniversity/historical-news-sentiment)
