@@ -31,6 +31,7 @@ If you want to run the scripts without installation you need to:
 - Install requirement
 ```commandline
 pip install setuptools wheel
+python -m pip install build
 ```
 Change your current working directory to the location of your pyproject.toml file.
 ```
