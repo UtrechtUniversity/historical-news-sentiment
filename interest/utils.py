@@ -156,3 +156,19 @@ def save_filtered_articles(input_file: Any, article_id: str,
     print('output_fp', output_fp)
     with open(output_fp, "w", encoding=ENCODING) as json_file:
         json.dump(data, json_file, indent=4)
+
+
+def get_file_name_without_extension(full_path: str) -> str:
+    """
+    Extracts the file name without extension from a full path.
+
+    Args:
+        full_path (str): The full path of the file.
+
+    Returns:
+        str: The file name without extension.
+
+    """
+    base_name = os.path.basename(full_path)
+    file_name_without_ext = os.path.splitext(base_name)[0]
+    return file_name_without_ext
