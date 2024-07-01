@@ -3,10 +3,11 @@ requires = ["setuptools", "setuptools-scm"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "packagename"
-description = "My package description"
+name = "interest"
+description = "A python package to extract the sentiment of the historical Dutch news articles"
 authors = [
-    {name = "name", email = "name@uu.nl"},
+    {name = "Shiva", email = "s.nadi@uu.nl"},
+    {name = "Parisa Zahedi", email = "p.zahedi@uu.nl"}
 ]
 readme = "README.md"
 requires-python = ">=3.8"
@@ -26,7 +27,7 @@ lint = ["flake8"]
 test = ["pytest", "mypy"]
 
 [tool.setuptools]
-packages = ["packagename"]
+packages = ["interest"]
 
 [tool.flake8]
 max-line-length = 99
