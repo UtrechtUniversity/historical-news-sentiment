@@ -18,7 +18,7 @@ on:
 
 # Replace packagename with your package name
 env:
-  PACKAGE_NAME: packagename
+  PACKAGE_NAME: interest
 
 jobs:
   build:
