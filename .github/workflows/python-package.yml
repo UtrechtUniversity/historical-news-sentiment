@@ -48,10 +48,10 @@ jobs:
         python -m pip install .
 
 #    Uncomment the actions below depending on the linters and tests you want to do
-#    - name: Lint with flake8
-#      run: |
-#        python -m pip install flake8
-#        flake8 $PACKAGE_NAME
+    - name: Lint with flake8
+      run: |
+       python -m pip install flake8
+       flake8 $PACKAGE_NAME
 #    - name: Lint with pylint
 #      run: |
 #        python -m pip install pylint
@@ -64,10 +64,10 @@ jobs:
 #      run: |
 #        python -m pip install pytest
 #        pytest tests
-#    - name: Test with MyPy
-#      run: |
-#        python -m pip install mypy
-#        mypy $PACKAGE_NAME
+    - name: Test with MyPy
+      run: |
+       python -m pip install mypy
+       mypy $PACKAGE_NAME
 #    - name: Check if documentation builds.
 #      run: |
 #        python -m pip install sphinx sphinx-rtd-theme sphinxcontrib-napoleon sphinx-autodoc-typehints
