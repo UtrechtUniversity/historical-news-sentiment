@@ -74,26 +74,34 @@ class TitleFilter(DocumentFilter):
 
 class YearFilter(DocumentFilter):
     """
-       Filter documents by year.
+    Filter documents by a range of years.
 
-       Attributes:
-           year (int): The year to filter by.
+    Attributes:
+        start_year (int): The start year of the range.
+        end_year (int): The end year of the range.
     """
-    def __init__(self, year: int):
-        self.year = year
+    def __init__(self, start_year: int, end_year: int):
+        self.start_year = start_year
+        self.end_year = end_year
 
     def filter_document(self, document: Document) -> bool:
         """
-                Filter documents by year.
+        Filter documents by a range of years.
 
-                Args:
-                    document (Document): The document to be filtered.
+        Args:
+            document (Document): The document to be filtered.
 
-                Returns:
-                    bool: True if the document's year matches the specified
-                    year, False otherwise.
+        Returns:
+            bool: True if the document's year is within the specified range,
+            False otherwise.
         """
-        return document.year == self.year
+        if document.year is None:
+            return False
+        if self.start_year is not None and document.year < self.start_year:
+            return False
+        if self.end_year is not None and document.year > self.end_year:
+            return False
+        return True
 
 
 class DecadeFilter(DocumentFilter):

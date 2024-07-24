@@ -62,7 +62,9 @@ def create_filter(filter_config: Dict[str, Any]) -> DocumentFilter:
     if filter_type == 'TitleFilter':
         return TitleFilter(filter_config['title'])
     if filter_type == 'YearFilter':
-        return YearFilter(filter_config['year'])
+        start_year = filter_config['start_year']
+        end_year = filter_config['end_year']
+        return YearFilter(start_year, end_year)
     if filter_type == 'DecadeFilter':
         return DecadeFilter(filter_config['decade'])
     if filter_type == 'KeywordsFilter':
