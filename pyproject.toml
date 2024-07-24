@@ -40,6 +40,9 @@ max-line-length = 99
 max-line-length=100
 max-locals=35
 max-args=10
+disable = [
+    "R0911"
+]
 
 [[tool.mypy.overrides]]
 module = [
