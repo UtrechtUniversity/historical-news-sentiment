@@ -116,7 +116,8 @@ In this step, you may select articles based on a filter or a collection of filte
                     "filters": [
                         {
                             "type": "YearFilter",
-                            "year": 2022
+                            "start_year": 1800,
+                            "end_year": 1910
                         },
                         {
                             "type": "DecadeFilter",
