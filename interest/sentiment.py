@@ -10,6 +10,8 @@ import logging
 import multiprocessing
 from time import time
 from tqdm import tqdm
+import string
+
 
 # logging.basicConfig(format="%(levelname)s - %(asctime)s: %(message)s", datefmt= '%H:%M:%S', level=logging.INFO)
 nltk.download('punkt')
@@ -41,15 +43,26 @@ class SentimentAnalyser:
             negative_words = f.read().splitlines()
         return positive_words, negative_words
 
+    # def _preprocess_text(self, text) -> str:
+    #     """Preprocess text by decapitalizing and removing specific punctuation."""
+    #     text = text.lower()
+        
+    #     # punctuation_to_remove = string.punctuation.replace('.', '')
+    #     # preprocessed_text = text.translate(str.maketrans('', '', punctuation_to_remove))
+        
+    #     return text
+
+
     def text_to_word_vectors(self) -> List[np.ndarray]:
         word_vectors = []
-        missing_words = set()  
+        missing_words = set()
 
-        words = [word for article in self.articles 
-                        for sentence in article 
-                        for word in sentence.split()]
-
-        for word in words:
+        # Apply preprocessing to each sentence
+        sentences = [word.lower() for article in self.articles 
+                                                       for sentence in article 
+                                                       for word in sentence.split()]
+        
+        for word in sentences:
             if word in self.w2v_pretrained_model.key_to_index:
                 word_vectors.append(self.w2v_pretrained_model[word])
             else:
