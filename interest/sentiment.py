@@ -43,16 +43,18 @@ class SentimentAnalyser:
 
     def text_to_word_vectors(self) -> List[np.ndarray]:
         word_vectors = []
-        missing_words = []
-        
-        for article in self.articles:
-            for sentence in article:
-                for word in sentence.split():
-                    if word in self.w2v_pretrained_model .key_to_index:
-                        word_vectors.append(self.w2v_pretrained_model [word])
-                    else:
-                        missing_words.append(word)
-            
+        missing_words = set()  
+
+        words = [word for article in self.articles 
+                        for sentence in article 
+                        for word in sentence.split()]
+
+        for word in words:
+            if word in self.w2v_pretrained_model.key_to_index:
+                word_vectors.append(self.w2v_pretrained_model[word])
+            else:
+                missing_words.add(word)
+
         if missing_words:
             logging.warning(f"{len(missing_words)} words not found in the model: {', '.join(missing_words)}")
         
