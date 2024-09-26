@@ -36,7 +36,7 @@ class SentimentAnalyser:
         """Load articles from the CSV file and return a list of sentences."""
         df = pd.read_csv(self.articles_fp)
         articles = df['text'].apply(lambda x: sent_tokenize(x)).tolist()
-        sentiment_labels = df['final_label'].fillna(1)
+        sentiment_labels = df['final_label'].fillna(0)
         return articles, sentiment_labels.tolist()
 
     def _load_sentiment_words(self) -> (List[str], List[str]):
@@ -190,13 +190,13 @@ class SentimentAnalyser:
 
             if abs(distance_diff) <= neutral_threshold:
                 article_sentiments_string.append("neutral")
-                article_sentiments.append(1)
+                article_sentiments.append(0)
             elif distance_diff > neutral_threshold:
                 article_sentiments_string.append("negative")
-                article_sentiments.append(0)
+                article_sentiments.append(-1)
             else:
                 article_sentiments_string.append("positive")
-                article_sentiments.append(2)
+                article_sentiments.append(1)
 
         print(article_sentiments_string)
         return article_sentiments
@@ -239,7 +239,7 @@ class SentimentAnalyser:
 
      
 if __name__ == '__main__':
-    analyzer = SentimentAnalyser('../data/negative_words_gpt.txt', '../data/positive_words_gpt.txt', '../data/merged/coal/1960s_coal.csv')
+    analyzer = SentimentAnalyser('../data/negative_words_gpt.txt', '../data/positive_words_gpt.txt', '../data/merged/combined_df.csv')
     print(type(analyzer.sentiment_labels))
     aritcles_word_vectors = analyzer.text_to_word_vectors()
     num_articles = len(aritcles_word_vectors)
