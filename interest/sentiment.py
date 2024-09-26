@@ -159,69 +159,52 @@ class SentimentAnalyser:
         # Show the plot
         plt.show()
 
-
-
-    # def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray):
-    #     """Reduce dimensions using PCA and plot the positive and negative word vectors."""
+    def calculate_article_sentiment(self, articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05):
+        """Calculate the sentiment (positive, negative, or neutral) of articles based on the distance to sentiment vectors."""
         
-    #     # Combine the positive and negative word vectors for PCA
-    #     vectors = np.vstack([positive_word_vector, negative_word_vector])
-
-    #     # Use PCA to reduce dimensionality to 2 components for visualization
-    #     pca = PCA(n_components=2)
-    #     reduced_vectors = pca.fit_transform(vectors)
-
-    #     # Create a scatter plot
-    #     plt.figure(figsize=(8, 6))
-    #     plt.scatter(reduced_vectors[0, 0], reduced_vectors[0, 1], color='green', label='Positive Sentiment')
-    #     plt.scatter(reduced_vectors[1, 0], reduced_vectors[1, 1], color='red', label='Negative Sentiment')
-
-    #     # Label the plot
-    #     plt.title('2D PCA of Positive and Negative Word Vectors')
-    #     plt.xlabel('Principal Component 1')
-    #     plt.ylabel('Principal Component 2')
-    #     plt.legend()
-    #     plt.show()
-    
-    
-
-    def calculate_similarity(self, articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector):
         vector_dim = positive_sentiment_word_vector.shape[0]
         if negative_sentiment_word_vector.shape[0] != vector_dim:
             raise ValueError("Dimensionality mismatch: positive and negative sentiment vectors must have the same dimensions.")
         
-        pos_similarities = []
-        neg_similarities = []
-        article_sentiment = []
-
+        article_sentiments = []
+        
         for article in articles_word_vectors:
+            pos_distances = []
+            neg_distances = []
+            
             for sentence_vector in article:
                 # Convert sentence_vector to a NumPy array
                 sentence_vector = np.array(sentence_vector)
 
                 # Check dimensionality
                 if len(sentence_vector) != vector_dim:
-                    print(len(sentence_vector))
-                    print(vector_dim)
                     raise ValueError("Dimensionality mismatch: sentence vectors must have the same dimensions as the sentiment vectors.")
                 
-                # Reshape vectors to be 2D (necessary for cosine_similarity)
-                sentence_vector_reshaped = sentence_vector.reshape(1, -1)
-                positive_vector_reshaped = positive_sentiment_word_vector.reshape(1, -1)
-                negative_vector_reshaped = negative_sentiment_word_vector.reshape(1, -1)
-                
-                # Calculate cosine similarity for each sentence with both positive and negative sentiment vectors
-                pos_similarity = cosine_similarity(sentence_vector_reshaped, positive_vector_reshaped)[0][0]
-                neg_similarity = cosine_similarity(sentence_vector_reshaped, negative_vector_reshaped)[0][0]
+                # Calculate Euclidean distance between the sentence vector and sentiment vectors
+                pos_distance = np.linalg.norm(sentence_vector - positive_sentiment_word_vector)
+                neg_distance = np.linalg.norm(sentence_vector - negative_sentiment_word_vector)
 
-                # Append similarities to the respective lists
-                pos_similarities.append(pos_similarity)
-                neg_similarities.append(neg_similarity)
+                # Append distances to the respective lists
+                pos_distances.append(pos_distance)
+                neg_distances.append(neg_distance)
 
-            mean_pos_similarity = np.mean(pos_similarities)
-            mean_neg_similarity = np.mean(neg_similarities)
-            article_sentiment.append(mean_pos_similarity - mean_neg_similarity)
-        print(article_sentiment)
+            # Compute the average distance for the article
+            mean_pos_distance = np.mean(pos_distances)
+            mean_neg_distance = np.mean(neg_distances)
+
+            # Classify sentiment based on distances
+            distance_diff = mean_pos_distance - mean_neg_distance
+
+            if abs(distance_diff) <= neutral_threshold:
+                article_sentiments.append("neutral")
+            elif distance_diff > neutral_threshold:
+                article_sentiments.append("negative")
+            else:
+                article_sentiments.append("positive")
+
+        print(article_sentiments)
+        return article_sentiments
+
 
      
 if __name__ == '__main__':
@@ -238,5 +221,5 @@ if __name__ == '__main__':
     negative_sentiment_word_vector = analyzer.negative_words_to_word_vectors()
     positive_sentiment_word_vector = analyzer.positive_words_to_word_vectors()
     articles_word_vectors = analyzer.text_to_word_vectors()
-    # analyzer.calculate_similarity(aritcles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector)
-    analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)
+    # analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)
+    analyzer.calculate_article_sentiment(articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05)
