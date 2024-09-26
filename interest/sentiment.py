@@ -29,7 +29,6 @@ class SentimentAnalyser:
             "../models/pretrained/Dutch_CoNLL17_corpus/model.bin", binary=True)
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt= '%H:%M:%S')
 
-        # self.cores = multiprocessing.cpu_count()
 
     def _load_articles(self) -> List[List[str]]:
         """Load articles from the CSV file and return a list of sentences."""
@@ -125,12 +124,17 @@ class SentimentAnalyser:
         
         return negative_word_vector
 
-
-    def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray):
-        """Reduce dimensions using PCA and plot the positive and negative word vectors."""
+    def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray, articles_word_vectors: List[List[np.ndarray]]):
+        """Reduce dimensions using PCA and plot the positive, negative, and text word vectors."""
         
-        # Combine the positive and negative word vectors for PCA
-        vectors = np.vstack([positive_word_vector, negative_word_vector])
+        # Flatten the list of lists of text word vectors into a single list of np.ndarrays
+        flattened_articles_word_vectors = [vec for sublist in articles_word_vectors for vec in sublist]
+
+        # Convert the flattened list of vectors to a 2D NumPy array
+        articles_word_vectors_array = np.vstack(flattened_articles_word_vectors)
+
+        # Combine positive, negative, and text word vectors for PCA
+        vectors = np.vstack([positive_word_vector, negative_word_vector, articles_word_vectors_array])
 
         # Use PCA to reduce dimensionality to 2 components for visualization
         pca = PCA(n_components=2)
@@ -138,23 +142,54 @@ class SentimentAnalyser:
 
         # Create a scatter plot
         plt.figure(figsize=(8, 6))
+
+        # Plot text word vectors
+        plt.scatter(reduced_vectors[2:, 0], reduced_vectors[2:, 1], color='blue', label='Text Word Vectors', alpha=0.6)
+
+        # Plot positive and negative sentiment vectors
         plt.scatter(reduced_vectors[0, 0], reduced_vectors[0, 1], color='green', label='Positive Sentiment')
         plt.scatter(reduced_vectors[1, 0], reduced_vectors[1, 1], color='red', label='Negative Sentiment')
 
         # Label the plot
-        plt.title('2D PCA of Positive and Negative Word Vectors')
+        plt.title('2D PCA of Positive, Negative, and Text Word Vectors')
         plt.xlabel('Principal Component 1')
         plt.ylabel('Principal Component 2')
         plt.legend()
+
+        # Show the plot
         plt.show()
 
+
+
+    # def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray):
+    #     """Reduce dimensions using PCA and plot the positive and negative word vectors."""
+        
+    #     # Combine the positive and negative word vectors for PCA
+    #     vectors = np.vstack([positive_word_vector, negative_word_vector])
+
+    #     # Use PCA to reduce dimensionality to 2 components for visualization
+    #     pca = PCA(n_components=2)
+    #     reduced_vectors = pca.fit_transform(vectors)
+
+    #     # Create a scatter plot
+    #     plt.figure(figsize=(8, 6))
+    #     plt.scatter(reduced_vectors[0, 0], reduced_vectors[0, 1], color='green', label='Positive Sentiment')
+    #     plt.scatter(reduced_vectors[1, 0], reduced_vectors[1, 1], color='red', label='Negative Sentiment')
+
+    #     # Label the plot
+    #     plt.title('2D PCA of Positive and Negative Word Vectors')
+    #     plt.xlabel('Principal Component 1')
+    #     plt.ylabel('Principal Component 2')
+    #     plt.legend()
+    #     plt.show()
+    
+    
+
     def calculate_similarity(self, articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector):
-        # Check dimensionality
         vector_dim = positive_sentiment_word_vector.shape[0]
         if negative_sentiment_word_vector.shape[0] != vector_dim:
             raise ValueError("Dimensionality mismatch: positive and negative sentiment vectors must have the same dimensions.")
         
-        # Initialize lists to store positive and negative similarities
         pos_similarities = []
         neg_similarities = []
         article_sentiment = []
@@ -183,20 +218,12 @@ class SentimentAnalyser:
                 pos_similarities.append(pos_similarity)
                 neg_similarities.append(neg_similarity)
 
-            # Compute the mean similarity for the entire article
             mean_pos_similarity = np.mean(pos_similarities)
             mean_neg_similarity = np.mean(neg_similarities)
             article_sentiment.append(mean_pos_similarity - mean_neg_similarity)
         print(article_sentiment)
 
-        # # Compare the mean similarities and print the overall sentiment for the article
-        # if mean_pos_similarity > mean_neg_similarity:
-        #     print(f"Article is more positive (mean_pos_similarity: {mean_pos_similarity}, mean_neg_similarity: {mean_neg_similarity}).")
-        # elif mean_pos_similarity < mean_neg_similarity:
-        #     print(f"Article is more negative (mean_pos_similarity: {mean_pos_similarity}, mean_neg_similarity: {mean_neg_similarity}).")
-        # else:
-        #     print(f"Article is neutral (mean_pos_similarity: {mean_pos_similarity}, mean_neg_similarity: {mean_neg_similarity}).")
-
+     
 if __name__ == '__main__':
     analyzer = SentimentAnalyser('../data/negative_words_gpt.txt', '../data/positive_words_gpt.txt', '../data/merged/coal/1960s_coal.csv')
     aritcles_word_vectors = analyzer.text_to_word_vectors()
@@ -210,5 +237,6 @@ if __name__ == '__main__':
 
     negative_sentiment_word_vector = analyzer.negative_words_to_word_vectors()
     positive_sentiment_word_vector = analyzer.positive_words_to_word_vectors()
-    analyzer.calculate_similarity(aritcles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector)
-    # analyzer.plot_word_vectors(pos, neg)
+    articles_word_vectors = analyzer.text_to_word_vectors()
+    # analyzer.calculate_similarity(aritcles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector)
+    analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)
