@@ -10,11 +10,13 @@ def parse_arguments():
     parser.add_argument("--negative_words_dir", required=True)
     parser.add_argument("--positive_words_dir", required=True)
     parser.add_argument("--articles_dir", required=True)
+    parser.add_argument("--model_dir", required=True)
+
     return parser.parse_args()
 
 
-def compute_sentiment(negative_words_dir, positive_words_dir, articles_dir):
-    analyzer = SentimentAnalyser('data/negative_words_gpt.txt', 'data/positive_words_gpt.txt', 'data/merged/combined_df.csv')
+def compute_sentiment(negative_words_dir, positive_words_dir, articles_dir, model_dir):
+    analyzer = SentimentAnalyser(negative_words_dir, positive_words_dir, articles_dir, model_dir)
     
     negative_sentiment_word_vector = analyzer.negative_words_to_word_vectors()
     positive_sentiment_word_vector = analyzer.positive_words_to_word_vectors()
@@ -26,4 +28,4 @@ def compute_sentiment(negative_words_dir, positive_words_dir, articles_dir):
 if __name__ == '__main__':
     args = parse_arguments()
     compute_sentiment(Path(args.negative_words_dir), Path(args.positive_words_dir),
-                       Path(args.articles_dir))
+                       Path(args.articles_dir), Path(args.model_dir))
