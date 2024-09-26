@@ -252,22 +252,3 @@ class SentimentAnalyser:
             'f1_score': f1,
             'confusion_matrix': conf_matrix
         }
-     
-if __name__ == '__main__':
-    analyzer = SentimentAnalyser('../data/negative_words_gpt.txt', '../data/positive_words_gpt.txt', '../data/merged/combined_df.csv')
-    aritcles_word_vectors = analyzer.text_to_word_vectors()
-    num_articles = len(aritcles_word_vectors)
-    num_sentence_vectors_per_article = len(aritcles_word_vectors[0])
-    sentence_vector_shape = len(aritcles_word_vectors[0][0])
-
-    print(f"Number of articles: {num_articles}")
-    print(f"Number of sentence vectors per article: {num_sentence_vectors_per_article}")
-    print(f"Shape of sentence vectors: {sentence_vector_shape}")
-
-    negative_sentiment_word_vector = analyzer.negative_words_to_word_vectors()
-    positive_sentiment_word_vector = analyzer.positive_words_to_word_vectors()
-    articles_word_vectors = analyzer.text_to_word_vectors()
-    # analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)
-    article_sentiments = analyzer.calculate_article_sentiment(articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05)
-    print(type(article_sentiments))
-    analyzer.evaluate_sentiment_predictions(analyzer.sentiment_labels, article_sentiments)
