@@ -14,22 +14,28 @@ import string
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
 from nltk.tokenize import sent_tokenize
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report, confusion_matrix, ConfusionMatrixDisplay
+import seaborn as sns
 
 
-# logging.basicConfig(format="%(levelname)s - %(asctime)s: %(message)s", datefmt= '%H:%M:%S', level=logging.INFO)
 nltk.download('punkt')
 
 class SentimentAnalyser:
-    def __init__(self, negative_words_fp: List[str], positive_words_fp: List[str], articles_fp: str):
+    def __init__(self, negative_words_fp: List[str], positive_words_fp: List[str], articles_fp: str, model_fp: str):
         self.negative_words_fp = negative_words_fp
         self.positive_words_fp = positive_words_fp
         self.positive_words, self.negative_words = self._load_sentiment_words()
         self.articles_fp = articles_fp
         self.articles, self.sentiment_labels = self._load_articles()
         self.w2v_pretrained_model = gensim.models.KeyedVectors.load_word2vec_format(
-            "../models/pretrained/Dutch_CoNLL17_corpus/model.bin", binary=True)
-        logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt= '%H:%M:%S')
+            model_fp, binary=True)
+        logging.basicConfig(
+            level=logging.INFO,
+            format='%(asctime)s - %(levelname)s - %(message)s',
+            datefmt='%H:%M:%S',
+            filename='analyser.log', 
+            filemode='w'  # 'a' to append, 'w' to overwrite the log file each time
+        )
 
 
     def _load_articles(self) -> List[List[str]]:
@@ -211,7 +217,7 @@ class SentimentAnalyser:
         - article_sentiments: List of predicted sentiment labels (from the sentiment model).
         
         Returns:
-        - A dictionary containing accuracy, precision, recall, and F1 score for each sentiment class.
+        - A dictionary containing accuracy, precision, recall, F1 score for each sentiment class, and the confusion matrix.
         """
         
         if len(sentiment_labels) != len(article_sentiments):
@@ -225,22 +231,30 @@ class SentimentAnalyser:
         f1 = f1_score(sentiment_labels, article_sentiments, average='weighted')
 
         report = classification_report(sentiment_labels, article_sentiments, target_names=["positive", "negative", "neutral"])
+        conf_matrix = confusion_matrix(sentiment_labels, article_sentiments)
 
         print("Classification Report:")
         print(report)
+        print("Confusion Matrix:")
+        print(conf_matrix)
+
+        # Plot confusion matrix
+        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, 
+                                    display_labels=["positive", "negative", "neutral"])
+        disp.plot(cmap=plt.cm.Blues)
+        plt.title('Confusion Matrix')
+        plt.show()
         
         return {
             'accuracy': accuracy,
             'precision': precision,
             'recall': recall,
-            'f1_score': f1
+            'f1_score': f1,
+            'confusion_matrix': conf_matrix
         }
-
-
      
 if __name__ == '__main__':
     analyzer = SentimentAnalyser('../data/negative_words_gpt.txt', '../data/positive_words_gpt.txt', '../data/merged/combined_df.csv')
-    print(type(analyzer.sentiment_labels))
     aritcles_word_vectors = analyzer.text_to_word_vectors()
     num_articles = len(aritcles_word_vectors)
     num_sentence_vectors_per_article = len(aritcles_word_vectors[0])
