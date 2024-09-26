@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Tuple
 import  pandas as pd
 import numpy as np
 import gensim
@@ -13,6 +13,8 @@ from tqdm import tqdm
 import string
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA
+from nltk.tokenize import sent_tokenize
+from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, classification_report
 
 
 # logging.basicConfig(format="%(levelname)s - %(asctime)s: %(message)s", datefmt= '%H:%M:%S', level=logging.INFO)
@@ -24,7 +26,7 @@ class SentimentAnalyser:
         self.positive_words_fp = positive_words_fp
         self.positive_words, self.negative_words = self._load_sentiment_words()
         self.articles_fp = articles_fp
-        self.articles = self._load_articles()
+        self.articles, self.sentiment_labels = self._load_articles()
         self.w2v_pretrained_model = gensim.models.KeyedVectors.load_word2vec_format(
             "../models/pretrained/Dutch_CoNLL17_corpus/model.bin", binary=True)
         logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s', datefmt= '%H:%M:%S')
@@ -34,7 +36,8 @@ class SentimentAnalyser:
         """Load articles from the CSV file and return a list of sentences."""
         df = pd.read_csv(self.articles_fp)
         articles = df['text'].apply(lambda x: sent_tokenize(x)).tolist()
-        return articles  
+        sentiment_labels = df['final_label'].fillna(1)
+        return articles, sentiment_labels.tolist()
 
     def _load_sentiment_words(self) -> (List[str], List[str]):
         """Load the list of positive and negative words."""
@@ -157,7 +160,9 @@ class SentimentAnalyser:
         if negative_sentiment_word_vector.shape[0] != vector_dim:
             raise ValueError("Dimensionality mismatch: positive and negative sentiment vectors must have the same dimensions.")
         
+        article_sentiments_string = []
         article_sentiments = []
+
         
         for article in articles_word_vectors:
             pos_distances = []
@@ -184,19 +189,58 @@ class SentimentAnalyser:
             distance_diff = mean_pos_distance - mean_neg_distance
 
             if abs(distance_diff) <= neutral_threshold:
-                article_sentiments.append("neutral")
+                article_sentiments_string.append("neutral")
+                article_sentiments.append(1)
             elif distance_diff > neutral_threshold:
-                article_sentiments.append("negative")
+                article_sentiments_string.append("negative")
+                article_sentiments.append(0)
             else:
-                article_sentiments.append("positive")
+                article_sentiments_string.append("positive")
+                article_sentiments.append(2)
 
-        print(article_sentiments)
+        print(article_sentiments_string)
         return article_sentiments
+
+
+    def evaluate_sentiment_predictions(self, sentiment_labels, article_sentiments):
+        """
+        Evaluate the performance of the sentiment prediction using evaluation metrics.
+        
+        Parameters:
+        - sentiment_labels: List of true sentiment labels (from the labeled dataset).
+        - article_sentiments: List of predicted sentiment labels (from the sentiment model).
+        
+        Returns:
+        - A dictionary containing accuracy, precision, recall, and F1 score for each sentiment class.
+        """
+        
+        if len(sentiment_labels) != len(article_sentiments):
+            print(len(sentiment_labels))
+            print(len(article_sentiments))
+            raise ValueError("The length of sentiment_labels and article_sentiments must be the same.")
+        
+        accuracy = accuracy_score(sentiment_labels, article_sentiments)
+        precision = precision_score(sentiment_labels, article_sentiments, average='weighted')
+        recall = recall_score(sentiment_labels, article_sentiments, average='weighted')
+        f1 = f1_score(sentiment_labels, article_sentiments, average='weighted')
+
+        report = classification_report(sentiment_labels, article_sentiments, target_names=["positive", "negative", "neutral"])
+
+        print("Classification Report:")
+        print(report)
+        
+        return {
+            'accuracy': accuracy,
+            'precision': precision,
+            'recall': recall,
+            'f1_score': f1
+        }
 
 
      
 if __name__ == '__main__':
     analyzer = SentimentAnalyser('../data/negative_words_gpt.txt', '../data/positive_words_gpt.txt', '../data/merged/coal/1960s_coal.csv')
+    print(type(analyzer.sentiment_labels))
     aritcles_word_vectors = analyzer.text_to_word_vectors()
     num_articles = len(aritcles_word_vectors)
     num_sentence_vectors_per_article = len(aritcles_word_vectors[0])
@@ -210,4 +254,6 @@ if __name__ == '__main__':
     positive_sentiment_word_vector = analyzer.positive_words_to_word_vectors()
     articles_word_vectors = analyzer.text_to_word_vectors()
     # analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)
-    analyzer.calculate_article_sentiment(articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05)
+    article_sentiments = analyzer.calculate_article_sentiment(articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05)
+    print(type(article_sentiments))
+    analyzer.evaluate_sentiment_predictions(analyzer.sentiment_labels, article_sentiments)
