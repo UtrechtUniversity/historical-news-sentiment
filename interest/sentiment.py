@@ -204,7 +204,7 @@ class SentimentAnalyser:
                 article_sentiments_string.append("positive")
                 article_sentiments.append(1)
 
-        print(article_sentiments_string)
+        # print(article_sentiments_string)
         return article_sentiments
 
 
