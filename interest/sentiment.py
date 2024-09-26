@@ -127,20 +127,14 @@ class SentimentAnalyser:
     def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray, articles_word_vectors: List[List[np.ndarray]]):
         """Reduce dimensions using PCA and plot the positive, negative, and text word vectors."""
         
-        # Flatten the list of lists of text word vectors into a single list of np.ndarrays
         flattened_articles_word_vectors = [vec for sublist in articles_word_vectors for vec in sublist]
-
-        # Convert the flattened list of vectors to a 2D NumPy array
         articles_word_vectors_array = np.vstack(flattened_articles_word_vectors)
-
-        # Combine positive, negative, and text word vectors for PCA
         vectors = np.vstack([positive_word_vector, negative_word_vector, articles_word_vectors_array])
 
         # Use PCA to reduce dimensionality to 2 components for visualization
         pca = PCA(n_components=2)
         reduced_vectors = pca.fit_transform(vectors)
 
-        # Create a scatter plot
         plt.figure(figsize=(8, 6))
 
         # Plot text word vectors
@@ -150,13 +144,10 @@ class SentimentAnalyser:
         plt.scatter(reduced_vectors[0, 0], reduced_vectors[0, 1], color='green', label='Positive Sentiment')
         plt.scatter(reduced_vectors[1, 0], reduced_vectors[1, 1], color='red', label='Negative Sentiment')
 
-        # Label the plot
         plt.title('2D PCA of Positive, Negative, and Text Word Vectors')
         plt.xlabel('Principal Component 1')
         plt.ylabel('Principal Component 2')
         plt.legend()
-
-        # Show the plot
         plt.show()
 
     def calculate_article_sentiment(self, articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05):
@@ -173,10 +164,8 @@ class SentimentAnalyser:
             neg_distances = []
             
             for sentence_vector in article:
-                # Convert sentence_vector to a NumPy array
                 sentence_vector = np.array(sentence_vector)
 
-                # Check dimensionality
                 if len(sentence_vector) != vector_dim:
                     raise ValueError("Dimensionality mismatch: sentence vectors must have the same dimensions as the sentiment vectors.")
                 
@@ -184,7 +173,6 @@ class SentimentAnalyser:
                 pos_distance = np.linalg.norm(sentence_vector - positive_sentiment_word_vector)
                 neg_distance = np.linalg.norm(sentence_vector - negative_sentiment_word_vector)
 
-                # Append distances to the respective lists
                 pos_distances.append(pos_distance)
                 neg_distances.append(neg_distance)
 
