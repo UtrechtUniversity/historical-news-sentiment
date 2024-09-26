@@ -15,17 +15,16 @@ def parse_arguments():
     return parser.parse_args()
 
 
-def compute_sentiment(negative_words_dir, positive_words_dir, articles_dir, model_dir):
-    analyzer = SentimentAnalyser(negative_words_dir, positive_words_dir, articles_dir, model_dir)
-    
+def compute_sentiment(negative_words_dir, positive_words_dir, articles_dir, model_dir):  # noqa: E501
+    analyzer = SentimentAnalyser(negative_words_dir, positive_words_dir, articles_dir, model_dir)  # noqa: E501
     negative_sentiment_word_vector = analyzer.negative_words_to_word_vectors()
     positive_sentiment_word_vector = analyzer.positive_words_to_word_vectors()
     articles_word_vectors = analyzer.text_to_word_vectors()
-    analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)
-    article_sentiments = analyzer.calculate_article_sentiment(articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05)
-    analyzer.evaluate_sentiment_predictions(analyzer.sentiment_labels, article_sentiments)
+    analyzer.plot_word_vectors(negative_sentiment_word_vector, positive_sentiment_word_vector, articles_word_vectors)  # noqa: E501
+    article_sentiments = analyzer.calculate_article_sentiment(articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05)  # noqa: E501
+    analyzer.evaluate_sentiment_predictions(analyzer.sentiment_labels, article_sentiments)  # noqa: E501
+
 
 if __name__ == '__main__':
     args = parse_arguments()
-    compute_sentiment(Path(args.negative_words_dir), Path(args.positive_words_dir),
-                       Path(args.articles_dir), Path(args.model_dir))
+    compute_sentiment(Path(args.negative_words_dir), Path(args.positive_words_dir), Path(args.articles_dir), Path(args.model_dir))  # noqa: E501
