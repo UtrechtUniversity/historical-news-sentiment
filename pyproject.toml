@@ -13,13 +13,18 @@ readme = "README.md"
 requires-python = ">=3.8"
 license = {text = "MIT"}
 classifiers = [
-    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
     "License :: OSI Approved :: MIT License",
 ]
 dynamic = ["version"]
 dependencies = [
-    # "numpy ~= 1.23.4",
-    # "scikit-learn ~= 0.19.1",
+    "numpy ~= 1.23.4",
+    "pandas ~= 1.5.0",
+    "gensim ~= 4.0.0",
+    "nltk ~= 3.6.0",
+    "tqdm ~= 4.62.0",
+    "matplotlib ~= 3.5.0",
+    "scikit-learn ~= 0.24.2"
 ]
 
 [project.optional-dependencies]
