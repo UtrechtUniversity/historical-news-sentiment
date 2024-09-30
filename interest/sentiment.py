@@ -1,4 +1,5 @@
 from typing import List, Tuple
+from collections import Counter
 import pandas as pd
 import numpy as np
 import gensim  # type: ignore
@@ -35,7 +36,7 @@ class SentimentAnalyser:
             format='%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%H:%M:%S',
             filename='analyser.log',
-            filemode='w'
+            filemode='w' 
         )
 
     def _load_articles(self) -> Tuple[List[List[str]], List[int]]:
@@ -204,41 +205,99 @@ class SentimentAnalyser:
         # print(article_sentiments_string)
         return article_sentiments
 
-    def evaluate_sentiment_predictions(self, sentiment_labels, article_sentiments):  # noqa: E501
+    def evaluate_sentiment_predictions(self, sentiment_labels, article_sentiments, sentiment_type='multi'):
         """
         Evaluate the performance of the sentiment prediction using evaluation metrics.
 
         Parameters:
         - sentiment_labels: List of true sentiment labels (from the labeled dataset).
-        - article_sentiments: List of predicted sentiment labels (from the sentiment model).  # noqa: E501
+        - article_sentiments: List of predicted sentiment labels (from the sentiment model).
+        - sentiment_type: 'multi' for multi-class sentiment evaluation, 'binary' for binary (positive vs negative). 
 
         Returns:
-        - A dictionary containing accuracy, precision, recall, F1 score for each sentiment class, and the confusion matrix.  # noqa: E501
+        - A dictionary containing accuracy, precision, recall, F1 score for each sentiment class, and the confusion matrix.
         """
 
         if len(sentiment_labels) != len(article_sentiments):
-            print(len(sentiment_labels))
-            print(len(article_sentiments))
-            raise ValueError("The length of sentiment_labels and article_sentiments must be the same.")  # noqa: E501
+            raise ValueError("The length of sentiment_labels and article_sentiments must be the same.")
 
-        accuracy = accuracy_score(sentiment_labels, article_sentiments)
-        precision = precision_score(sentiment_labels, article_sentiments, average='weighted')  # noqa: E501
-        recall = recall_score(sentiment_labels, article_sentiments, average='weighted')  # noqa: E501
-        f1 = f1_score(sentiment_labels, article_sentiments, average='weighted')
+        if sentiment_type == 'binary':
+            # Merge neutral (0) and positive (1) into positive (1)
+            modified_sentiment_labels = [1 if label in [0, 1] else -1 for label in sentiment_labels]
+            modified_article_sentiments = [1 if sentiment in [0, 1] else -1 for sentiment in article_sentiments]
+            target_names = ["positive", "negative"]
 
-        report = classification_report(sentiment_labels, article_sentiments, target_names=["positive", "negative", "neutral"])  # noqa: E501
-        conf_matrix = confusion_matrix(sentiment_labels, article_sentiments)
+            # ****
+            label_counts = Counter(modified_sentiment_labels)
+            prediction_counts = Counter(modified_article_sentiments)
 
-        print("Classification Report:")
-        print(report)
-        print("Confusion Matrix:")
-        print(conf_matrix)
+            # Print counts for 1, -1, and 0
+            print("Counts in modified_sentiment_labels:")
+            print(f"Positive (1): {label_counts[1]}")
+            print(f"Neutral (0): {label_counts[0]}")
+            print(f"Negative (-1): {label_counts[-1]}")
 
-        # Plot confusion matrix
-        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=["positive", "negative", "neutral"])  # noqa: E501
-        disp.plot(cmap=plt.cm.Blues)
-        plt.title('Confusion Matrix')
-        plt.show()
+            print("Counts in modified_article_sentiments:")
+            print(f"Positive (1): {prediction_counts[1]}")
+            print(f"Neutral (0): {prediction_counts[0]}")
+            print(f"Negative (-1): {prediction_counts[-1]}")
+
+
+            # ***
+
+            conf_matrix = confusion_matrix(modified_sentiment_labels, modified_article_sentiments, labels=[1, -1])
+            print("Confusion Matrix:")
+            print(conf_matrix)
+
+            report = classification_report(modified_sentiment_labels, modified_article_sentiments, target_names=target_names)
+            print("Classification Report:")
+            print(report)
+
+            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=target_names)
+            disp.plot(cmap=plt.cm.Blues)
+            plt.title('Confusion Matrix')
+            plt.show()
+        else:
+            # Multi-class: Keep original labels, define target names based on unique classes
+            modified_sentiment_labels = sentiment_labels
+            modified_article_sentiments = article_sentiments
+            target_names = ["positive", "neutral", "negative"]
+
+            # ****
+            label_counts = Counter(modified_sentiment_labels)
+            prediction_counts = Counter(modified_article_sentiments)
+
+            # Print counts for 1, -1, and 0
+            print("Counts in modified_sentiment_labels:")
+            print(f"Positive (1): {label_counts[1]}")
+            print(f"Neutral (0): {label_counts[0]}")
+            print(f"Negative (-1): {label_counts[-1]}")
+
+            print("Counts in modified_article_sentiments:")
+            print(f"Positive (1): {prediction_counts[1]}")
+            print(f"Neutral (0): {prediction_counts[0]}")
+            print(f"Negative (-1): {prediction_counts[-1]}")
+
+
+            # ***
+
+            conf_matrix = confusion_matrix(modified_sentiment_labels, modified_article_sentiments, labels=[1, 0, -1])
+            print("Confusion Matrix:")
+            print(conf_matrix)
+
+            report = classification_report(modified_sentiment_labels, modified_article_sentiments, target_names=target_names)
+            print("Classification Report:")
+            print(report)
+
+            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=target_names)
+            disp.plot(cmap=plt.cm.Blues)
+            plt.title('Confusion Matrix')
+            plt.show()
+
+        accuracy = accuracy_score(modified_sentiment_labels, modified_article_sentiments)
+        precision = precision_score(modified_sentiment_labels, modified_article_sentiments, average='weighted')
+        recall = recall_score(modified_sentiment_labels, modified_article_sentiments, average='weighted')
+        f1 = f1_score(modified_sentiment_labels, modified_article_sentiments, average='weighted')
 
         return {
             'accuracy': accuracy,
