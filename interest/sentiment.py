@@ -1,13 +1,13 @@
-from typing import List
+from typing import List, Tuple
 import pandas as pd
 import numpy as np
-import gensim
-import nltk
-from nltk.tokenize import sent_tokenize
+import gensim  # type: ignore
+import nltk  # type: ignore
+from nltk.tokenize import sent_tokenize  # type: ignore
 import logging
 from tqdm import tqdm
 import matplotlib.pyplot as plt
-from sklearn.decomposition import PCA
+from sklearn.decomposition import PCA  # type: ignore
 from sklearn.metrics import (
     accuracy_score,
     precision_score,
@@ -16,13 +16,13 @@ from sklearn.metrics import (
     classification_report,
     confusion_matrix,
     ConfusionMatrixDisplay
-)
+)  # type: ignore
 
 nltk.download('punkt')
-
+# flake8: noqa: E501
 
 class SentimentAnalyser:
-    def __init__(self, negative_words_fp: List[str], positive_words_fp: List[str], articles_fp: str, model_fp: str):  # noqa: E501
+    def __init__(self, negative_words_fp: str, positive_words_fp: str, articles_fp: str, model_fp: str):  # noqa: E501
         self.negative_words_fp = negative_words_fp
         self.positive_words_fp = positive_words_fp
         self.positive_words, self.negative_words = self._load_sentiment_words()
@@ -35,17 +35,17 @@ class SentimentAnalyser:
             format='%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%H:%M:%S',
             filename='analyser.log',
-            filemode='w'  # 'a' to append, 'w' to overwrite the log file each time  # noqa: E501
+            filemode='w'
         )
 
-    def _load_articles(self) -> List[List[str]]:
+    def _load_articles(self) -> Tuple[List[List[str]], List[int]]:
         """Load articles from the CSV file and return a list of sentences."""
         df = pd.read_csv(self.articles_fp)
         articles = df['text'].apply(lambda x: sent_tokenize(x)).tolist()
         sentiment_labels = df['final_label'].fillna(0)
         return articles, sentiment_labels.tolist()
 
-    def _load_sentiment_words(self) -> (List[str], List[str]):
+    def _load_sentiment_words(self) -> Tuple[List[str], List[str]]:
         """Load the list of positive and negative words."""
         with open(self.positive_words_fp, 'r') as f:
             positive_words = f.read().splitlines()
