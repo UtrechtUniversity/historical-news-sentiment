@@ -40,14 +40,35 @@ class SentimentAnalyser:
         )
 
     def _load_articles(self) -> Tuple[List[List[str]], List[int]]:
-        """Load articles from the CSV file and return a list of sentences."""
+        """
+        Load articles from the CSV file specified by `self.articles_fp`.
+
+        This method reads the CSV file, tokenizes the article text into sentences,
+        and extracts sentiment labels.
+
+        Returns:
+            Tuple[List[List[str]], List[int]]:
+                - A list where each element is a list of sentences from an article.
+                - A list of sentiment labels corresponding to each article.
+        """
         df = pd.read_csv(self.articles_fp)
         articles = df['text'].apply(lambda x: sent_tokenize(x)).tolist()
         sentiment_labels = df['final_label'].fillna(0)
         return articles, sentiment_labels.tolist()
 
     def _load_sentiment_words(self) -> Tuple[List[str], List[str]]:
-        """Load the list of positive and negative words."""
+        """
+        Load the list of positive and negative words from the specified 'self.negative_words_fp' file paths.
+
+        This method reads two files:
+        - A file containing positive words (one word per line).
+        - A file containing negative words (one word per line).
+
+        Returns:
+            Tuple[List[str], List[str]]:
+                - A list of positive words.
+                - A list of negative words.
+        """
         with open(self.positive_words_fp, 'r') as f:
             positive_words = f.read().splitlines()
         with open(self.negative_words_fp, 'r') as f:
@@ -55,6 +76,18 @@ class SentimentAnalyser:
         return positive_words, negative_words
 
     def text_to_word_vectors(self) -> List[List[np.ndarray]]:
+        """
+        Convert the articles' sentences into word vectors using a pre-trained Word2Vec model.
+
+        This method processes each article and each sentence within it by converting words to their 
+        corresponding Word2Vec vectors. For each sentence, the average vector of its words is computed. 
+        If a word is not found in the Word2Vec model, it is added to the `missing_words` set.
+
+        Returns:
+            List[List[np.ndarray]]:
+                A list where each element represents an article, and within each article is a list of
+                NumPy arrays representing the averaged word vectors for each sentence.
+        """
         articles_word_vectors = []
         missing_words = set()
 
