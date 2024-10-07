@@ -1,6 +1,6 @@
 # Interest
 
-This repository contains code for calculating the sentiment of historical news articles. While it has been tested on the [Delpher Kranten](https://www.delpher.nl/nl/kranten) corpus, the code is adaptable to analyze the sentiment of any given text. Using the [dataQuest](https://github.com/UtrechtUniversity/dataQuest?tab=readme-ov-file) Python package, articles related to fossil fuels (gas, coal, and oil) were filtered to train and test the models in this repository. The goal is to examine the evolving sentiment toward the use of these fuels between 1960 and 1995. The <mark>interest</mark> Python package offers a variety of sentiment analysis methods, optimized and tested for accuracy in processing text data.
+This repository contains code for calculating the sentiment of historical news articles. While it has been tested on the [Delpher Kranten](https://www.delpher.nl/nl/kranten) corpus, the code is adaptable to analyze the sentiment of any given text. Using the [dataQuest](https://github.com/UtrechtUniversity/dataQuest?tab=readme-ov-file) Python package, articles related to fossil fuels (gas, coal, and oil) were filtered to train and test the models in this repository. The goal is to examine the evolving sentiment toward the use of these fuels between 1960 and 1995. The *interest* Python package offers a variety of sentiment analysis methods, optimized and tested for accuracy in processing text data.
 
 The interest Python package includes the following methods:
 
