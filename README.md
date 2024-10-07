@@ -1,13 +1,10 @@
-# Python packaging template with Setuptools
+# Interest
 
-This template repository is created by the [UU Research Engineering team](https://utrechtuniversity.github.io/research-engineering/) and is aimed to provide a simple project template for python package development. This template uses [Setuptools](https://setuptools.pypa.io/en/latest/userguide/quickstart.html) as the packaging toolkit, there is another [template](https://github.com/UtrechtUniversity/re-python-package-poetry) that is very similar that uses [Poetry](https://python-poetry.org/).
+This repository contains code for calculating the sentiment of historical news articles. While it has been tested on the [Delpher Kranten](https://www.delpher.nl/nl/kranten) corpus, the code is adaptable to analyze the sentiment of any given text. Using the [dataQuest](https://github.com/UtrechtUniversity/dataQuest?tab=readme-ov-file) Python package, articles related to fossil fuels (gas, coal, and oil) were filtered to train and test the models in this repository. The goal is to examine the evolving sentiment toward the use of these fuels between 1960 and 1995. The <mark>interest</mark> Python package offers a variety of sentiment analysis methods, optimized and tested for accuracy in processing text data.
 
-The template includes:
-- Project directory structure
-- Project configuration using `pyproject.toml`
-- GitHub actions workflows for testing, linting, type checking and publishing on pypi
+The interest Python package includes the following methods:
 
-Many other project templates exist, check for example this advanced [python template](https://github.com/NLeSC/python-template) by the NL eScience Center.
+- An unsupervised approach that calculates the sentiment of articles by measuring the Euclidean distance between    positive, negative, and article word vectors using document vectors.
 
 ## Dependencies
 This template uses:
