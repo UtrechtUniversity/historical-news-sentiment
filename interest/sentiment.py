@@ -1,4 +1,5 @@
-from typing import List, Tuple
+from typing import List, Tuple, Dict, Any
+from collections import Counter
 import pandas as pd
 import numpy as np
 import gensim  # type: ignore
@@ -35,18 +36,39 @@ class SentimentAnalyser:
             format='%(asctime)s - %(levelname)s - %(message)s',
             datefmt='%H:%M:%S',
             filename='analyser.log',
-            filemode='w'
+            filemode='w' 
         )
 
     def _load_articles(self) -> Tuple[List[List[str]], List[int]]:
-        """Load articles from the CSV file and return a list of sentences."""
+        """
+        Load articles from the CSV file specified by `self.articles_fp`.
+
+        This method reads the CSV file, tokenizes the article text into sentences,
+        and extracts sentiment labels.
+
+        Returns:
+            Tuple[List[List[str]], List[int]]:
+                - A list where each element is a list of sentences from an article.
+                - A list of sentiment labels corresponding to each article.
+        """
         df = pd.read_csv(self.articles_fp)
         articles = df['text'].apply(lambda x: sent_tokenize(x)).tolist()
         sentiment_labels = df['final_label'].fillna(0)
         return articles, sentiment_labels.tolist()
 
     def _load_sentiment_words(self) -> Tuple[List[str], List[str]]:
-        """Load the list of positive and negative words."""
+        """
+        Load the list of positive and negative words from the specified 'self.negative_words_fp' file paths.
+
+        This method reads two files:
+        - A file containing positive words (one word per line).
+        - A file containing negative words (one word per line).
+
+        Returns:
+            Tuple[List[str], List[str]]:
+                - A list of positive words.
+                - A list of negative words.
+        """
         with open(self.positive_words_fp, 'r') as f:
             positive_words = f.read().splitlines()
         with open(self.negative_words_fp, 'r') as f:
@@ -54,6 +76,18 @@ class SentimentAnalyser:
         return positive_words, negative_words
 
     def text_to_word_vectors(self) -> List[List[np.ndarray]]:
+        """
+        Convert the articles' sentences into word vectors using a pre-trained Word2Vec model.
+
+        This method processes each article and each sentence within it by converting words to their 
+        corresponding Word2Vec vectors. For each sentence, the average vector of its words is computed. 
+        If a word is not found in the Word2Vec model, it is added to the `missing_words` set.
+
+        Returns:
+            List[List[np.ndarray]]:
+                A list where each element represents an article, and within each article is a list of
+                NumPy arrays representing the averaged word vectors for each sentence.
+        """
         articles_word_vectors = []
         missing_words = set()
 
@@ -86,6 +120,18 @@ class SentimentAnalyser:
         return articles_word_vectors
 
     def positive_words_to_word_vectors(self) -> np.ndarray:
+        """
+        Convert a list of positive words into their corresponding Word2Vec vectors.
+
+        This method processes each positive word by converting it to its Word2Vec vector. 
+        If a word is not found in the Word2Vec model, it is added to the `missing_positive_words` set. 
+        The function returns the average vector of all positive words, or a zero vector if none are found.
+
+        Returns:
+            np.ndarray:
+                The averaged Word2Vec vector of positive words. If no valid vectors are found,
+                a zero vector of the same dimensionality as the Word2Vec vectors is returned.
+        """
         positive_word_vectors = []
         missing_positive_words = set()
 
@@ -109,6 +155,19 @@ class SentimentAnalyser:
         return positive_word_vector
 
     def negative_words_to_word_vectors(self) -> np.ndarray:
+        """
+        Converts negative words to word vectors using the pre-trained word2vec model.
+        
+        For each negative word, this function looks up its vector representation from the
+        pre-trained word2vec model. If a word is not found, it is added to the 
+        `missing_negative_words` set. The function returns the mean vector of all 
+        found words. If no valid vectors are found, a zero vector of the appropriate
+        size is returned.
+
+        Returns:
+            np.ndarray: The averaged word vector of the negative words, or a zero vector if no word vectors were found.
+        """
+
         negative_word_vectors = []
         missing_negative_words = set()
 
@@ -131,8 +190,23 @@ class SentimentAnalyser:
 
         return negative_word_vector
 
-    def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray, articles_word_vectors: List[List[np.ndarray]]):  # noqa: E501
-        """Reduce dimensions using PCA and plot the positive, negative, and text word vectors."""  # noqa: E501
+    def plot_word_vectors(self, positive_word_vector: np.ndarray, negative_word_vector: np.ndarray, articles_word_vectors: List[List[np.ndarray]]) -> None :  # noqa: E501
+        """
+        Reduces dimensionality of word vectors using PCA and visualizes them.
+
+        This method reduces the dimensionality of the positive, negative, and article 
+        word vectors to two components using PCA (Principal Component Analysis) for visualization. 
+        The reduced vectors are then plotted on a 2D scatter plot to show the relationship between 
+        the sentiment vectors (positive and negative) and the text vectors.
+
+        Args:
+            positive_word_vector (np.ndarray): Vector representing the positive sentiment.
+            negative_word_vector (np.ndarray): Vector representing the negative sentiment.
+            articles_word_vectors (List[List[np.ndarray]]): A list of lists of word vectors 
+                                                            for the articles' content.
+        Returns:
+            None: The function generates a plot and does not return any value.
+        """
 
         flattened_articles_word_vectors = [vec for sublist in articles_word_vectors for vec in sublist]  # noqa: E501
         articles_word_vectors_array = np.vstack(flattened_articles_word_vectors)  # noqa: E501
@@ -157,9 +231,31 @@ class SentimentAnalyser:
         plt.legend()
         plt.show()
 
-    def calculate_article_sentiment(self, articles_word_vectors, negative_sentiment_word_vector, positive_sentiment_word_vector, neutral_threshold=0.05):  # noqa: E501
-        """Calculate the sentiment (positive, negative, or neutral) of articles based on the distance to sentiment vectors."""  # noqa: E501
+    def calculate_article_sentiment(self, 
+                                articles_word_vectors: List[List[np.ndarray]], 
+                                negative_sentiment_word_vector: np.ndarray, 
+                                positive_sentiment_word_vector: np.ndarray, 
+                                neutral_threshold: float = 0.05) -> List[int]:
+        """
+        Calculates the sentiment (positive, negative, or neutral) of articles based on the distance to sentiment vectors.
 
+        For each article, this function computes the Euclidean distance between the sentence 
+        vectors and the positive and negative sentiment vectors. It then classifies the article's 
+        overall sentiment as positive, negative, or neutral based on the average distances. 
+        Articles whose average distance difference falls within the `neutral_threshold` are 
+        considered neutral.
+
+        Args:
+            articles_word_vectors (List[List[np.ndarray]]): A list of lists of word vectors for each article.
+            negative_sentiment_word_vector (np.ndarray): Vector representing the negative sentiment.
+            positive_sentiment_word_vector (np.ndarray): Vector representing the positive sentiment.
+            neutral_threshold (float, optional): The threshold for classifying an article as neutral. 
+                                                Defaults to 0.05.
+
+        Returns:
+            List[int]: A list of sentiment labels for each article where 1 represents positive, 
+                    0 represents neutral, and -1 represents negative.
+        """
         vector_dim = positive_sentiment_word_vector.shape[0]
         if negative_sentiment_word_vector.shape[0] != vector_dim:
             raise ValueError("Dimensionality mismatch: positive and negative sentiment vectors must have the same dimensions.")  # noqa: E501
@@ -204,41 +300,106 @@ class SentimentAnalyser:
         # print(article_sentiments_string)
         return article_sentiments
 
-    def evaluate_sentiment_predictions(self, sentiment_labels, article_sentiments):  # noqa: E501
+    def evaluate_sentiment_predictions(self, 
+                                   sentiment_labels: List[int], 
+                                   article_sentiments: List[int], 
+                                   sentiment_type: str = 'multi') -> Dict[str, Any]:
         """
-        Evaluate the performance of the sentiment prediction using evaluation metrics.
+        Evaluate the performance of the sentiment prediction using various evaluation metrics.
 
-        Parameters:
-        - sentiment_labels: List of true sentiment labels (from the labeled dataset).
-        - article_sentiments: List of predicted sentiment labels (from the sentiment model).  # noqa: E501
+        This function compares the true sentiment labels with the predicted sentiment labels and
+        calculates metrics such as accuracy, precision, recall, F1 score, and the confusion matrix.
+        It supports both binary classification (positive vs negative) and multi-class classification
+        (positive, neutral, negative).
+
+        Args:
+            sentiment_labels (List[int]): List of true sentiment labels from the labeled dataset. 
+                                        (1 for positive, 0 for neutral, -1 for negative).
+            article_sentiments (List[int]): List of predicted sentiment labels from the sentiment model. 
+                                            (1 for positive, 0 for neutral, -1 for negative).
+            sentiment_type (str, optional): Specifies the type of evaluation. 'multi' for multi-class 
+                                            (default), 'binary' for binary classification (positive vs negative).
 
         Returns:
-        - A dictionary containing accuracy, precision, recall, F1 score for each sentiment class, and the confusion matrix.  # noqa: E501
+            Dict[str, Any]: A dictionary containing evaluation metrics:
+                - 'accuracy': The accuracy of the sentiment predictions.
+                - 'precision': The weighted precision score.
+                - 'recall': The weighted recall score.
+                - 'f1_score': The weighted F1 score.
+                - 'confusion_matrix': The confusion matrix of the predictions.
         """
 
+
         if len(sentiment_labels) != len(article_sentiments):
-            print(len(sentiment_labels))
-            print(len(article_sentiments))
-            raise ValueError("The length of sentiment_labels and article_sentiments must be the same.")  # noqa: E501
+            raise ValueError("The length of sentiment_labels and article_sentiments must be the same.")
 
-        accuracy = accuracy_score(sentiment_labels, article_sentiments)
-        precision = precision_score(sentiment_labels, article_sentiments, average='weighted')  # noqa: E501
-        recall = recall_score(sentiment_labels, article_sentiments, average='weighted')  # noqa: E501
-        f1 = f1_score(sentiment_labels, article_sentiments, average='weighted')
+        if sentiment_type == 'binary':
+            # Merge neutral (0) and positive (1) into positive (1)
+            modified_sentiment_labels = [1 if label in [0, 1] else -1 for label in sentiment_labels]
+            modified_article_sentiments = [1 if sentiment in [0, 1] else -1 for sentiment in article_sentiments]
+            target_names = ["positive", "negative"]
 
-        report = classification_report(sentiment_labels, article_sentiments, target_names=["positive", "negative", "neutral"])  # noqa: E501
-        conf_matrix = confusion_matrix(sentiment_labels, article_sentiments)
+            label_counts = Counter(modified_sentiment_labels)
+            prediction_counts = Counter(modified_article_sentiments)
 
-        print("Classification Report:")
-        print(report)
-        print("Confusion Matrix:")
-        print(conf_matrix)
+            print("Counts in modified_sentiment_labels:")
+            print(f"Positive (1): {label_counts[1]}")
+            print(f"Neutral (0): {label_counts[0]}")
+            print(f"Negative (-1): {label_counts[-1]}")
 
-        # Plot confusion matrix
-        disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=["positive", "negative", "neutral"])  # noqa: E501
-        disp.plot(cmap=plt.cm.Blues)
-        plt.title('Confusion Matrix')
-        plt.show()
+            print("Counts in modified_article_sentiments:")
+            print(f"Positive (1): {prediction_counts[1]}")
+            print(f"Neutral (0): {prediction_counts[0]}")
+            print(f"Negative (-1): {prediction_counts[-1]}")
+
+            conf_matrix = confusion_matrix(modified_sentiment_labels, modified_article_sentiments, labels=[1, -1])
+            print("Confusion Matrix:")
+            print(conf_matrix)
+
+            report = classification_report(modified_sentiment_labels, modified_article_sentiments, target_names=target_names)
+            print("Classification Report:")
+            print(report)
+
+            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=target_names)
+            disp.plot(cmap=plt.cm.Blues)  # type: ignore[attr-defined]
+            plt.title('Confusion Matrix')
+            plt.show()
+        else:
+            # Multi-class: Keep original labels, define target names based on unique classes
+            modified_sentiment_labels = sentiment_labels
+            modified_article_sentiments = article_sentiments
+            target_names = ["positive", "neutral", "negative"]
+
+            label_counts = Counter(modified_sentiment_labels)
+            prediction_counts = Counter(modified_article_sentiments)
+
+            print("Counts in modified_sentiment_labels:")
+            print(f"Positive (1): {label_counts[1]}")
+            print(f"Neutral (0): {label_counts[0]}")
+            print(f"Negative (-1): {label_counts[-1]}")
+
+            print("Counts in modified_article_sentiments:")
+            print(f"Positive (1): {prediction_counts[1]}")
+            print(f"Neutral (0): {prediction_counts[0]}")
+            print(f"Negative (-1): {prediction_counts[-1]}")
+
+            conf_matrix = confusion_matrix(modified_sentiment_labels, modified_article_sentiments, labels=[1, 0, -1])
+            print("Confusion Matrix:")
+            print(conf_matrix)
+
+            report = classification_report(modified_sentiment_labels, modified_article_sentiments, target_names=target_names)
+            print("Classification Report:")
+            print(report)
+
+            disp = ConfusionMatrixDisplay(confusion_matrix=conf_matrix, display_labels=target_names)
+            disp.plot(cmap=plt.cm.Blues)  # type: ignore[attr-defined]
+            plt.title('Confusion Matrix')
+            plt.show()
+
+        accuracy = accuracy_score(modified_sentiment_labels, modified_article_sentiments)
+        precision = precision_score(modified_sentiment_labels, modified_article_sentiments, average='weighted')
+        recall = recall_score(modified_sentiment_labels, modified_article_sentiments, average='weighted')
+        f1 = f1_score(modified_sentiment_labels, modified_article_sentiments, average='weighted')
 
         return {
             'accuracy': accuracy,
