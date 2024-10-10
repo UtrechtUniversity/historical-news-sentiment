@@ -58,13 +58,13 @@ export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
 
 ## About the Project
 
-Date: May 2024
+**Date:** May 2024
 
-Researcher(s):
+**Researcher(s):**
 
 Pim Huijnen (p.huijnen@uu.nl)
 
-Research Software Engineer(s):
+**Research Software Engineer(s):**
 
 Shiva Nadi (s.nadi@uu.nl)
 Parisa Zahedi (p.zahedi@uu.nl)
