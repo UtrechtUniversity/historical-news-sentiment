@@ -56,6 +56,9 @@ export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
 - NLTK
 - scikit-learn
 
+## Usage
+To be compeleted ...
+
 ## About the Project
 
 ### Date: May 2024
