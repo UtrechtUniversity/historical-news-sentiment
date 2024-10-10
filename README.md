@@ -56,41 +56,15 @@ export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
 - NLTK
 - scikit-learn
 
-### Step 3: Change GitHub Actions workflow
-- Open `.github/workflows/python-package.yml`
-- Change `packagename` to the name of your package (line 21)
-- Many actions are commented out, uncomment them when you want to start using them.
+## About the Project
 
-### Step 4: Replace this README file with your README
-- You may use this [README template](https://github.com/UtrechtUniversity/rse-project-templates/blob/master/README-template.md)
+Date: May 2024
 
-### Step 5: Change the license file
-- Open `LICENSE`, change the copyright holder when required (line 3)
-- Or replace the entire license file if another license applies
+Researcher(s):
 
-### Step 6: Add a citation file
-- Create a citation file for your repository using [cffinit](https://citation-file-format.github.io/cff-initializer-javascript/#/)
+Pim Huijnen (p.huijnen@uu.nl)
 
-### Step 7: Publising on Pypi (optional/later)
-For publishing the package on Pypi you need to create [API tokens](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries).
+Research Software Engineer(s):
 
-## Next Steps
-
-Now that you have succesfully created a package, there are some further steps to consider.
-
-### Tagging your commits
-
-When your library grows, you might want to give some commits (on main) a more human-readable tag, such as 1.2.0. To do this, do the following:
-
-```bash
-git checkout main && git pull
-git tag -a "v1.2.0" -m "Version 1.2.0"
-git push --tags  # upload the tags to GitHub
-```
-
-### Publishing on Pypi 
-For publishing the package on Pypi you need to create [API tokens](https://docs.github.com/en/actions/automating-builds-and-tests/building-and-testing-python#publishing-to-package-registries).
-
-If you put this token in GitHub secrets with the name `PYPI_API_TOKEN`, then you can automatically generate a new release on PyPi by creating a release on GitHub. You have to select the tag that was created in the previous step.
-
-Note however that your first release on PyPi has to be done manually and can't be done using this method.
+Shiva Nadi (s.nadi@uu.nl)
+Parisa Zahedi (p.zahedi@uu.nl)
