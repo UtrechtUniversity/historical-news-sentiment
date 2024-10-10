@@ -48,10 +48,13 @@ pip install .
 ```
 export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
 ```
-### Step 2: Change the name of your package in pyproject.toml
-- Change the name of the folder `packagename` to the name of your package
-- Open `pyproject.toml` and change `packagename` to the name of your package
-- Also change the authors and optionally any other items that you want to change
+
+## Built with
+- NumPy
+- Pandas
+- Gensim
+- NLTK
+- scikit-learn
 
 ### Step 3: Change GitHub Actions workflow
 - Open `.github/workflows/python-package.yml`
