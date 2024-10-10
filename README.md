@@ -58,13 +58,35 @@ export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
 
 ## About the Project
 
-**Date:** May 2024
+### Date: May 2024
 
-**Researcher(s):**
+### Researcher(s):
 
-Pim Huijnen (p.huijnen@uu.nl)
+- Pim Huijnen (p.huijnen@uu.nl)
 
-**Research Software Engineer(s):**
+### Research Software Engineer(s):
 
-Shiva Nadi (s.nadi@uu.nl)  
-Parisa Zahedi (p.zahedi@uu.nl)
+- Shiva Nadi (s.nadi@uu.nl)  
+- Parisa Zahedi (p.zahedi@uu.nl)
+
+## License
+
+The code in this project is released under [MIT license] (https://github.com/UtrechtUniversity/patent-breakthrough/blob/main/LICENSE).
+
+## Contributing
+
+Contributions are what make the open source community an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.
+
+To contribute:
+
+Fork the Project
+Create your Feature Branch (git checkout -b feature/AmazingFeature)
+Commit your Changes (git commit -m 'Add some AmazingFeature')
+Push to the Branch (git push origin feature/AmazingFeature)
+Open a Pull Request
+
+## Contact
+
+Pim Huijnen - p.huijnen@uu.nl
+
+Project Link:  https://github.com/UtrechtUniversity/historical-news-sentiment.git
