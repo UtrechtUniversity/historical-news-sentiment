@@ -71,19 +71,19 @@ export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
 
 ## License
 
-The code in this project is released under [MIT license] (https://github.com/UtrechtUniversity/patent-breakthrough/blob/main/LICENSE).
+The code in this project is released under [MIT license](https://github.com/UtrechtUniversity/patent-breakthrough/blob/main/LICENSE).
 
 ## Contributing
 
 Contributions are what make the open source community an amazing place to learn, inspire, and create. Any contributions you make are greatly appreciated.
 
-To contribute:
+### To contribute:
 
-Fork the Project
-Create your Feature Branch (git checkout -b feature/AmazingFeature)
-Commit your Changes (git commit -m 'Add some AmazingFeature')
-Push to the Branch (git push origin feature/AmazingFeature)
-Open a Pull Request
+- Fork the Project
+- Create your Feature Branch (git checkout -b feature/AmazingFeature)
+- Commit your Changes (git commit -m 'Add some AmazingFeature')
+- Push to the Branch (git push origin feature/AmazingFeature)
+- Open a Pull Request
 
 ## Contact
 
