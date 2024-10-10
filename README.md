@@ -1,25 +1,22 @@
 # Interest
 
-This repository contains code for calculating the sentiment of historical news articles. While it has been tested on the [Delpher Kranten](https://www.delpher.nl/nl/kranten) corpus, the code is adaptable to analyze the sentiment of any given text. Using the [dataQuest](https://github.com/UtrechtUniversity/dataQuest?tab=readme-ov-file) Python package, articles related to fossil fuels (gas, coal, and oil) were filtered to train and test the models in this repository. The goal is to examine the evolving sentiment toward the use of these fuels between 1960 and 1995. The __interest__ Python package offers a variety of sentiment analysis methods, optimized and tested for accuracy in processing text data.
+This repository contains code for calculating the sentiment of historical news articles. While it has been tested on the [Delpher Kranten](https://www.delpher.nl/nl/kranten) corpus, the code is adaptable to analyze the sentiment of any given text. Using the [dataQuest](https://github.com/UtrechtUniversity/dataQuest?tab=readme-ov-file) Python package, articles related to fossil fuels (gas, coal, and oil) were filtered to train and test the models in this repository. The goal is to examine the evolving sentiment toward the use of these fuels between 1960 and 1995. The ```interest```Python package offers a variety of sentiment analysis methods, optimized and tested for accuracy in processing text data.
 
 The interest Python package includes the following methods:
 
 - An unsupervised approach that calculates the sentiment of articles by measuring the Euclidean distance between    positive, negative, and article word vectors using document vectors.
 
-## Dependencies
-This template uses:
-| Tool | Aim |
-| --- | --- |
-| setuptools | building |
-| flake8, pylint | code linting |
-| pytest | testing |
-| pydocstyle | checking docstrings |
-| mypy | type checking |
-| sphinx | documentation generation |
+## Getting Started
+Clone this repository to your working station to obtain examples and python scripts:
 
-If needed, most of these tools can be removed by simply removing the GitHub action that calls the tool, or by changing `pyproject.toml`
+```https://github.com/UtrechtUniversity/historical-news-sentiment.git```
 
-## How to use
+## Prerequisites
+
+```
+- Python [>=3.8, <3.11]
+- jupyterlab (or any other program to run jupyter notebooks)
+```
 
 ### Step 1: Create new repository from this template
 Click `Use this template` at the top of this page to create a new repository using this template
