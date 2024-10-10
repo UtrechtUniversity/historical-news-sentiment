@@ -66,5 +66,5 @@ Pim Huijnen (p.huijnen@uu.nl)
 
 **Research Software Engineer(s):**
 
-Shiva Nadi (s.nadi@uu.nl)
+Shiva Nadi (s.nadi@uu.nl)  
 Parisa Zahedi (p.zahedi@uu.nl)
