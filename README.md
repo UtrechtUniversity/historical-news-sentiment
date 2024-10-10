@@ -17,10 +17,36 @@ Clone this repository to your working station to obtain examples and python scri
 - Python [>=3.8, <3.11]
 - jupyterlab (or any other program to run jupyter notebooks)
 ```
+To install jupyterlab:
 
-### Step 1: Create new repository from this template
-Click `Use this template` at the top of this page to create a new repository using this template
+``` pip install jupyterlab```
 
+## Installation
+
+### Option 1 - Install Interest package
+To run the project, ensure to install the interest package.
+
+``` pip install interest ```
+
+### Option 2 - Run from source code
+If you want to run the scripts without installation you need to:
+
+    - Install requirement
+    ```
+    pip install setuptools wheel
+    python -m pip install build
+    ```
+    Change your current working directory to the location of your pyproject.toml file.
+
+    ```
+    python -m build
+    pip install .
+    ```
+
+    - Set PYTHONPATH environment: On Linux and Mac OS, you might have to set the PYTHONPATH environment variable to point to this directory.
+    ```
+    export PYTHONPATH="current working directory/dataQuest:${PYTHONPATH}"
+    ```
 ### Step 2: Change the name of your package in pyproject.toml
 - Change the name of the folder `packagename` to the name of your package
 - Open `pyproject.toml` and change `packagename` to the name of your package
