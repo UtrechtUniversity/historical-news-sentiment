@@ -66,6 +66,7 @@ To be compeleted ...
 ### Researcher(s):
 
 - Pim Huijnen (p.huijnen@uu.nl)
+- Anastasia Giachanou (a.giachanou@uu.nl)
 
 ### Research Software Engineer(s):
 
