@@ -10,10 +10,10 @@ authors = [
     {name = "Parisa Zahedi", email = "p.zahedi@uu.nl"}
 ]
 readme = "README.md"
-requires-python = ">=3.8"
+requires-python = ">=3.11"
 license = {text = "MIT"}
 classifiers = [
-    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.11",
     "License :: OSI Approved :: MIT License",
 ]
 dynamic = ["version"]
