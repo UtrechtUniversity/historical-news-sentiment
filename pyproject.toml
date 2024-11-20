@@ -24,7 +24,10 @@ dependencies = [
     "nltk",
     "tqdm",
     "matplotlib",
-    "scikit-learn"
+    "scikit-learn",
+    "torch",
+    "transformers",
+    "ray"
 ]
 
 [project.optional-dependencies]
@@ -36,3 +39,6 @@ packages = ["interest"]
 
 [tool.flake8]
 max-line-length = 99
+
+[tool.pylint]
+disable = ["R0902","R0914","R0913","E1101","W0718","W0719"]
