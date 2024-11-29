@@ -4,6 +4,7 @@ including training, evaluation, and metric computation.
 """
 
 import os
+from typing import List
 from sklearn import metrics
 import numpy as np
 import torch
@@ -98,8 +99,9 @@ class TransformerTrainer:
         """
         self.model.eval()
         total_loss = 0.0
-        all_labels = []
-        all_probabilities = []
+        all_labels: List[int] = []
+        all_probabilities: List[List[float]] = []
+
         for batch in eval_loader:
             batch = {
                 k: v.squeeze(1).to(self.device) if k in ['input_ids', 'attention_mask',
@@ -113,8 +115,8 @@ class TransformerTrainer:
 
             logits = outputs.logits
             probabilities = torch.softmax(logits, dim=-1)
-            all_probabilities.extend(probabilities.cpu().numpy())
-            all_labels.extend(batch['labels'].cpu().numpy())
+            all_probabilities.extend(probabilities.cpu().numpy().tolist())
+            all_labels.extend(batch['labels'].cpu().numpy().tolist())
 
         avg_loss = total_loss / len(eval_loader)
         labels_array = np.array(all_labels)
