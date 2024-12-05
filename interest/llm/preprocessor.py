@@ -36,6 +36,8 @@ class TextPreprocessor:
         Returns:
             str: The preprocessed text.
         """
+        if not isinstance(text, str):
+            text = ""
         if self.remove_non_ascii:
             text = re.sub(r'[^\x00-\x7F]+', '', text)
         if self.lowercase:
