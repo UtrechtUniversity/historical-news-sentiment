@@ -8,18 +8,71 @@ from sklearn.metrics import classification_report, confusion_matrix
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union
+from lime.lime_text import LimeTextExplainer
+import shap
+import spacy
+
 
 
 class Classifier:
     """
-    A class for training and evaluating various classifiers on text data.
+    A class for training and evaluating various traditional classifiers on text data.
     """
 
     def __init__(self) -> None:
         """
         Initialize the vetorizer object.
         """
-        self.vectorizer = TfidfVectorizer()
+        self.vectorizer = TfidfVectorizer(tokenizer=self.negation_aware_tokenizer)
+        try:
+            self.nlp = spacy.load('nl_core_news_sm')
+        except OSError:
+            # If the model is not found, download it
+            print("Model not found. Downloading...")
+            spacy.cli.download('nl_core_news_sm')
+            self.nlp = spacy.load('nl_core_news_sm')
+
+    def negation_aware_tokenizer(self, text: str) -> list:
+        """
+        Tokenizes the input text while marking negated words after negation terms,
+        handling context, synonym expansion, and using dependency parsing.
+
+        Args:
+            text (str): The input text to tokenize.
+
+        Returns:
+            list: A list of processed tokens with negated words marked.
+        """
+        # Define the negation terms and their synonyms
+        negations = ['niet', 'geen', 'nooit', 'niets', 'noch', 'niemand', 'nochthans', 'ondertussen', 'zonder']
+        negation_synonyms = {
+            'geen': ['zonder'],  # "zonder" is a synonym of "geen" (without)
+            # Add more synonym pairs as needed
+        }
+        
+        # Process the text using spaCy for dependency parsing
+        doc = self.nlp(text)
+        tokens = [token.text for token in doc]
+        processed_tokens = []
+        
+        # Identify negations and expand to context
+        for i, token in enumerate(doc):
+            # Check if the token is a negation term or synonym
+            if token.text.lower() in negations:
+                processed_tokens.append("NEG_" + token.text.lower())
+                
+                # Mark the next few tokens as negated (context handling)
+                for j in range(i + 1, min(i + 3, len(doc))):  # Adjust window size as needed
+                    processed_tokens.append("NEG_" + doc[j].text.lower())
+            elif any(synonym in negation_synonyms and token.text.lower() in negation_synonyms[synonym] 
+                     for synonym in negation_synonyms):
+                # If the token is a synonym of a negation term
+                processed_tokens.append("NEG_" + token.text.lower())
+            else:
+                processed_tokens.append(token.text)
+                
+        return processed_tokens
+
 
     def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:  # noqa: E501
         """
@@ -163,6 +216,39 @@ class Classifier:
             self.plot_roc_curves(fpr_all, tpr_all, trained_classifiers)
         except Exception as e:
             print(f"Error occurred during training and evaluation: {e}")
+
+    def explain_with_lime(self, trained_classifiers: Dict[str, object], text_sample: str, label_sample: int) -> None:
+        """
+        Use LIME to explain the predictions of each classifier.
+
+        Parameters:
+        - trained_classifiers (Dict): Dictionary of trained classifiers.
+        - text_sample (str): A single text sample to explain.
+        - label_sample (int): True label for the sample.
+
+        Returns:
+        - None
+        """
+        explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])  # Adjust class names if needed
+        for clf_name, classifier in trained_classifiers.items():
+            print(f"\nExplaining prediction for {clf_name}...\n")
+            try:
+                # Define a prediction function for LIME
+                def predict_proba(texts):
+                    vectorized_texts = self.vectorizer.transform(texts)
+                    return classifier.predict_proba(vectorized_texts)
+
+                # Generate explanation
+                explanation = explainer.explain_instance(
+                    text_sample,
+                    predict_proba,
+                    num_features=10  # Number of features to explain
+                )
+                explanation.show_in_notebook()  # Visualize in notebook
+                explanation.save_to_file(f"{clf_name}_lime_explanation.html")  # Save as HTML
+            except Exception as e:
+                print(f"Error occurred while explaining with LIME for {clf_name}: {e}")
+
 
 if __name__ == "__main__":
     df = pd.read_csv("../data/merged/combined_df.csv")
