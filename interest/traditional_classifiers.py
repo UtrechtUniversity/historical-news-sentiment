@@ -23,7 +23,8 @@ class Classifier:
         """
         Initialize the vetorizer object.
         """
-        self.vectorizer = TfidfVectorizer(tokenizer=self.negation_aware_tokenizer)
+        self.vectorizer = TfidfVectorizer(ngram_range=(1, 2))
+
         try:
             self.nlp = spacy.load('nl_core_news_sm')
         except OSError:
@@ -36,10 +37,10 @@ class Classifier:
         """
         Tokenizes the input text while marking negated words after negation terms,
         handling context, synonym expansion, and using dependency parsing.
-
+        
         Args:
             text (str): The input text to tokenize.
-
+        
         Returns:
             list: A list of processed tokens with negated words marked.
         """
@@ -49,12 +50,12 @@ class Classifier:
             'geen': ['zonder'],  # "zonder" is a synonym of "geen" (without)
             # Add more synonym pairs as needed
         }
-        
+
         # Process the text using spaCy for dependency parsing
         doc = self.nlp(text)
         tokens = [token.text for token in doc]
         processed_tokens = []
-        
+
         # Identify negations and expand to context
         for i, token in enumerate(doc):
             # Check if the token is a negation term or synonym
@@ -65,13 +66,16 @@ class Classifier:
                 for j in range(i + 1, min(i + 3, len(doc))):  # Adjust window size as needed
                     processed_tokens.append("NEG_" + doc[j].text.lower())
             elif any(synonym in negation_synonyms and token.text.lower() in negation_synonyms[synonym] 
-                     for synonym in negation_synonyms):
+                    for synonym in negation_synonyms):
                 # If the token is a synonym of a negation term
                 processed_tokens.append("NEG_" + token.text.lower())
             else:
                 processed_tokens.append(token.text)
-                
+
+        # Now return tokens as unigrams or bigrams without combining multi-token negations
         return processed_tokens
+
+
 
 
     def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:  # noqa: E501
@@ -94,7 +98,7 @@ class Classifier:
 
         classifiers: Dict[str, object] = {
             "Gradient Boosting": GradientBoostingClassifier(**best_params_gradient_boosting, random_state=42),  # noqa: E501
-            "Support Vector Machine": SVC(**best_params_svm, class_weight='balanced', kernel='rbf', random_state=42),  # noqa: E501
+            "Support Vector Machine": SVC(**best_params_svm, class_weight='balanced', kernel='rbf', random_state=42, probability=True),  # noqa: E501
             "Logistic Regression": LogisticRegression(**best_params_logistic_regression, class_weight='balanced', max_iter=1000, random_state=42),  # noqa: E501
             "Random Forest": RandomForestClassifier(**best_params_random_forest, class_weight='balanced', random_state=42),  # noqa: E501
             "Naive Bayes": ComplementNB(**best_params_naive_bayes)
@@ -228,8 +232,11 @@ class Classifier:
 
         Returns:
         - None
-        """
-        explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])  # Adjust class names if needed
+        """  
+        
+        print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")
+
+        explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])
         for clf_name, classifier in trained_classifiers.items():
             print(f"\nExplaining prediction for {clf_name}...\n")
             try:
@@ -249,14 +256,18 @@ class Classifier:
             except Exception as e:
                 print(f"Error occurred while explaining with LIME for {clf_name}: {e}")
 
-
 if __name__ == "__main__":
-    df = pd.read_csv("../data/merged/combined_df.csv")
-    df = df[['date', 'newspaper_publisher', 'newspaper_title', 'text', 'decade', 'year', 'fuel', 'final_label']]
-    df['binary_label'] = df['final_label'].replace(0, 1)
-    df['binary_label'] = df['final_label'].replace(-1, 0)
-    text_set = df['text']
-    labels = df['binary_label']
     classifier = Classifier()
-    classifier.train_and_evaluate_classifiers(text_set, labels)
+    corpus = ["Dit is geen goede dag", "Ik heb geen idee"]
+    X = classifier.vectorizer.fit_transform(corpus)
+    print(classifier.vectorizer.get_feature_names_out())
+
+    # df = pd.read_csv("../data/merged/combined_df.csv")
+    # df = df[['date', 'newspaper_publisher', 'newspaper_title', 'text', 'decade', 'year', 'fuel', 'final_label']]
+    # df['binary_label'] = df['final_label'].replace(0, 1)
+    # df['binary_label'] = df['final_label'].replace(-1, 0)
+    # text_set = df['text']
+    # labels = df['binary_label']
+    # classifier = Classifier()
+    # classifier.train_and_evaluate_classifiers(text_set, labels)
 
