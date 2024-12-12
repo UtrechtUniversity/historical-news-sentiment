@@ -23,61 +23,16 @@ class Classifier:
         """
         Initialize the vetorizer object.
         """
-        self.vectorizer = TfidfVectorizer(ngram_range=(1, 2))
+        self.vectorizer = TfidfVectorizer(ngram_range=(1, 1))
 
         try:
             self.nlp = spacy.load('nl_core_news_sm')
         except OSError:
-            # If the model is not found, download it
             print("Model not found. Downloading...")
             spacy.cli.download('nl_core_news_sm')
             self.nlp = spacy.load('nl_core_news_sm')
 
-    def negation_aware_tokenizer(self, text: str) -> list:
-        """
-        Tokenizes the input text while marking negated words after negation terms,
-        handling context, synonym expansion, and using dependency parsing.
-        
-        Args:
-            text (str): The input text to tokenize.
-        
-        Returns:
-            list: A list of processed tokens with negated words marked.
-        """
-        # Define the negation terms and their synonyms
-        negations = ['niet', 'geen', 'nooit', 'niets', 'noch', 'niemand', 'nochthans', 'ondertussen', 'zonder']
-        negation_synonyms = {
-            'geen': ['zonder'],  # "zonder" is a synonym of "geen" (without)
-            # Add more synonym pairs as needed
-        }
-
-        # Process the text using spaCy for dependency parsing
-        doc = self.nlp(text)
-        tokens = [token.text for token in doc]
-        processed_tokens = []
-
-        # Identify negations and expand to context
-        for i, token in enumerate(doc):
-            # Check if the token is a negation term or synonym
-            if token.text.lower() in negations:
-                processed_tokens.append("NEG_" + token.text.lower())
-                
-                # Mark the next few tokens as negated (context handling)
-                for j in range(i + 1, min(i + 3, len(doc))):  # Adjust window size as needed
-                    processed_tokens.append("NEG_" + doc[j].text.lower())
-            elif any(synonym in negation_synonyms and token.text.lower() in negation_synonyms[synonym] 
-                    for synonym in negation_synonyms):
-                # If the token is a synonym of a negation term
-                processed_tokens.append("NEG_" + token.text.lower())
-            else:
-                processed_tokens.append(token.text)
-
-        # Now return tokens as unigrams or bigrams without combining multi-token negations
-        return processed_tokens
-
-
-
-
+  
     def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:  # noqa: E501
         """
         Train multiple classifiers on the training data.
