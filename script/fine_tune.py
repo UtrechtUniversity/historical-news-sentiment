@@ -8,12 +8,14 @@ from argparse import ArgumentParser
 import json
 import os
 from pathlib import Path
+import random
 
 import matplotlib.pyplot as plt
 import numpy as np
 import torch
 from torch.utils.data import DataLoader
-from transformers import get_scheduler
+from transformers import get_scheduler, AutoTokenizer
+from captum.attr import IntegratedGradients
 
 import ray
 from ray import tune
@@ -21,6 +23,7 @@ from ray._private.utils import get_ray_temp_dir
 from ray.air import session
 from ray.train import Checkpoint
 
+from config import search_space
 from interest.llm.preprocessor import TextPreprocessor
 from interest.llm.dataloader import CSVDataLoader
 from interest.llm.transformer_trainer import TransformerTrainer
@@ -190,6 +193,44 @@ def save_statistics(statistics: dict, output_dir: Path,
     print(f"Statistics saved to {file_path}")
 
 
+def save_attribution_plot(tokens, scores, output_dir, filename):
+    """
+    Save a bar plot of the top 20 token attributions.
+
+    Args:
+        tokens (list): Tokens corresponding to the input IDs.
+        scores (np.array): Attribution scores for each token. Can be multi-dimensional.
+        output_dir (str): Directory to save the plot.
+        filename (str): Filename for the plot.
+
+    Returns:
+        None
+    """
+    if len(scores.shape) > 1:
+        scores = scores.sum(axis=1)  # Sum attribution scores across embedding dimensions
+
+    # Get the absolute values of scores to identify the most important tokens
+    abs_scores = [abs(score) for score in scores]
+
+    # Get the top 20 tokens and their scores
+    top_indices = sorted(range(len(abs_scores)), key=lambda i: abs_scores[i], reverse=True)[:20]
+    top_tokens = [tokens[i] for i in top_indices]
+    top_scores = [scores[i] for i in top_indices]
+
+    # Create a bar plot for the top 20 tokens
+    plt.figure(figsize=(10, 4))
+    plt.bar(range(len(top_tokens)), top_scores, color='blue', alpha=0.6)
+    plt.xticks(range(len(top_tokens)), top_tokens, rotation=45, ha='right', fontsize=8)
+    plt.title("Top 20 Token-Level Attributions")
+    plt.tight_layout()
+
+    # Save the plot
+    output_path = Path(output_dir)
+    output_path.mkdir(parents=True, exist_ok=True)  # Ensure output directory exists
+    plt.savefig(output_path / filename)
+    plt.close()
+
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse command-line arguments for training and prediction tasks.
@@ -223,7 +264,7 @@ def parse_arguments() -> argparse.Namespace:
     main_parser = ArgumentParser(description="Main parser")
     subparsers = main_parser.add_subparsers(dest="mode")
 
-    #  parser_train = subparsers.add_parser("train", parents=[parser])
+    parser_train = subparsers.add_parser("train", parents=[parser])
     parser_predict = subparsers.add_parser("predict", parents=[parser])
     parser_predict.add_argument('--freeze', type=bool, default=False,
                                 help='freeze first layers while fine-tuning')
@@ -232,6 +273,15 @@ def parse_arguments() -> argparse.Namespace:
     parser_predict.add_argument('--model_path', type=str, required=True,
                                 help='model path of a checkpoint')
 
+    parser_exp = subparsers.add_parser("explain", parents=[parser])
+    parser_exp.add_argument('--freeze', type=bool, default=False,
+                            help='freeze first layers while fine-tuning')
+    parser_exp.add_argument('--batch_size', type=int, default=16,
+                            help='batch_size')
+    parser_exp.add_argument('--model_path', type=str, required=True,
+                            help='model path of a checkpoint')
+    parser_exp.add_argument('--use_exp', type=bool, default=False,
+                            help='use explainability')
     return main_parser.parse_args()
 
 
@@ -265,15 +315,17 @@ def predict(args: argparse.Namespace) -> None:
         freeze=args.freeze
     )
     trainer.load_model(args.model_path)
+    trainer.model.eval()
     probabilities = []
     labels = []
 
     # Disable gradient computation
     with torch.no_grad():
-        for batch in test_loader:
-            batch = {k: v.squeeze(1).to(trainer.device) if k in ['input_ids', 'attention_mask',
-                                                                 'token_type_ids']
-                     else v.to(trainer.device) for k, v in batch.items()}
+        for _, batch in enumerate(test_loader):
+            batch = {k: v.squeeze(1).to(trainer.device).long() if k in ['input_ids',
+                                                                        'attention_mask',
+                                                                        'token_type_ids']
+                     else v.to(trainer.device).long() for k, v in batch.items()}
 
             outputs = trainer.model(**batch)
             logits = outputs.logits
@@ -285,6 +337,110 @@ def predict(args: argparse.Namespace) -> None:
     statistics = trainer.make_stats(labels, probabilities)
     print(statistics)
     save_statistics(statistics, args.output_dir, filename="prediction_statistics.json")
+
+
+def explain_predict(args: argparse.Namespace) -> None:
+    """
+    Run prediction on a dataset using a pretrained model, and save the statistics.
+
+    Args:
+        args (argparse.Namespace): Parsed arguments from the command-line input.
+
+    Returns:
+        None
+    """
+
+    def custom_forward(input_embeddings, attention_mask):
+        outputs = model(
+            inputs_embeds=input_embeddings,  # Use embeddings instead of input_ids
+            attention_mask=attention_mask,
+        )
+        return outputs.logits  # Return the logits directly
+
+    csv_files = list(Path(args.data_dir).glob('*.csv'))
+
+    preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
+                                    lowercase=args.lowercase)
+    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+
+    _, _, test_dataset = data_loader.create_datasets(
+        label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
+        window_size=args.max_length,
+        stride=args.stride
+    )
+    test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
+
+    trainer = TransformerTrainer(
+        model_name=args.model_name,
+        num_labels=args.num_labels,
+        output_dir=args.output_dir,
+        freeze=args.freeze
+    )
+    trainer.load_model(args.model_path)
+    trainer.model.eval()
+    probabilities = []
+    labels = []
+    attributions = []
+
+    if args.use_exp:
+        tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+        model = trainer.model
+        ig = IntegratedGradients(custom_forward)
+
+    random.seed(42)
+
+    # Select one random article per class
+    articles_by_class = {}
+    for batch in test_loader:
+        for idx, label in enumerate(batch['labels']):
+            label = label.item()
+            if label not in articles_by_class:
+                # Get all indices for the current class within the batch
+                indices_for_class = [i for i, lbl in enumerate(batch['labels'])
+                                     if lbl.item() == label]
+
+                # Randomly select one index
+                random_idx = random.choice(indices_for_class)
+
+                # Select the article corresponding to the randomly selected index
+                single_article = {k: v[random_idx:random_idx + 1] for k, v in batch.items()}
+                articles_by_class[label] = single_article
+
+    # Disable gradient computation
+    with torch.no_grad():
+        for label, batch in articles_by_class.items():
+            batch = {k: v.squeeze(1).to(trainer.device).long() if k in ['input_ids',
+                                                                        'attention_mask',
+                                                                        'token_type_ids']
+                     else v.to(trainer.device).long() for k, v in batch.items()}
+
+            outputs = trainer.model(**batch)
+            logits = outputs.logits
+
+            prob = torch.softmax(logits, dim=-1)
+            probabilities.extend(prob.cpu().numpy())
+            labels.extend(batch['labels'].cpu().numpy())
+
+            if args.use_exp:
+                embedding_layer = trainer.model.get_input_embeddings()
+                input_embeddings = embedding_layer(batch['input_ids'])
+
+                attributions_batch, _ = ig.attribute(
+                    inputs=input_embeddings,
+                    target=batch['labels'],
+                    additional_forward_args=batch['attention_mask'],
+                    n_steps=50,
+                    return_convergence_delta=True,
+                )
+
+                for idx, attribution in enumerate(attributions_batch):
+                    token_attributions = attribution.cpu().detach().numpy()
+                    tokens = tokenizer.convert_ids_to_tokens(batch['input_ids'][idx].cpu().numpy())
+                    attribution_details = list(zip(tokens, token_attributions))
+                    attributions.append(attribution_details)
+
+                save_attribution_plot(tokens, attributions_batch[idx].cpu().detach().numpy(),
+                                      args.output_dir, f"attributions_class_{label}.png")
 
 
 def train(args: argparse.Namespace) -> None:
@@ -299,6 +455,7 @@ def train(args: argparse.Namespace) -> None:
     """
     ray.init()
     session_dir = get_ray_temp_dir()
+    print('session_dir', session_dir)
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
     csv_files = list(Path(args.data_dir).glob('*.csv'))
@@ -313,18 +470,11 @@ def train(args: argparse.Namespace) -> None:
         stride=args.stride
     )
 
-    resources = {"cpu": 1}
+    cpu_count = os.cpu_count()
+    resources = {"cpu": (cpu_count - 1) if cpu_count is not None else 1}
     device = "cuda" if torch.cuda.is_available() else "cpu"
     resources["gpu"] = 1 if device == "cuda" else 0
 
-    search_space = {
-        "epochs": tune.choice([2]),  # 3, 5, 7
-        "batch_size": tune.choice([16]),  # 16
-        "lr": tune.loguniform(1e-5, 5e-4),  #
-        "freeze": tune.choice([True])  # , False
-    }
-
-    # Run Ray Tune with preprocessed datasets
     analysis = tune.run(
         tune.with_parameters(
             train_transformer,
@@ -342,7 +492,7 @@ def train(args: argparse.Namespace) -> None:
 
     best_trial = analysis.get_best_trial(metric="val_loss", mode="min")
     print("Best trial config: ", best_trial.config)
-    session_dir_latest = session_dir+'/session_latest/artifacts/'
+    session_dir_latest = session_dir + '/session_latest/artifacts/'
     read_json_and_plot(session_dir_latest)
 
 
@@ -352,5 +502,7 @@ if __name__ == "__main__":
         train(argsparams)
     elif argsparams.mode == "predict":
         predict(argsparams)
+    elif argsparams.mode == "explain":
+        explain_predict(argsparams)
     else:
         raise Exception("Error argument!")
