@@ -11,8 +11,7 @@ from typing import Tuple, Dict, List, Union
 from lime.lime_text import LimeTextExplainer
 import shap
 import spacy
-
-
+import json
 
 class Classifier:
     """
@@ -32,8 +31,7 @@ class Classifier:
             spacy.cli.download('nl_core_news_sm')
             self.nlp = spacy.load('nl_core_news_sm')
 
-  
-    def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:  # noqa: E501
+    def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:
         """
         Train multiple classifiers on the training data.
 
@@ -44,20 +42,23 @@ class Classifier:
         Returns:
         - Dict: Trained classifiers.
         """
+        import json
 
-        best_params_gradient_boosting = {'learning_rate': 0.1, 'n_estimators': 200}  # noqa: E501
-        best_params_svm = {'C': 1, 'gamma': 0.1}
-        best_params_logistic_regression = {'C': 0.1, 'penalty': 'l2'}
-        best_params_random_forest = {'max_depth': None, 'n_estimators': 50}
-        best_params_naive_bayes = {'alpha': 0.1, 'norm': False}
+        try:
+            with open('hyperparameter_results.json', 'r') as f:
+                best_params = json.load(f)
+        except FileNotFoundError:
+            print("Best parameters file not found. Ensure hyperparameter optimization is completed.")
+            return {}
 
         classifiers: Dict[str, object] = {
-            "Gradient Boosting": GradientBoostingClassifier(**best_params_gradient_boosting, random_state=42),  # noqa: E501
-            "Support Vector Machine": SVC(**best_params_svm, class_weight='balanced', kernel='rbf', random_state=42, probability=True),  # noqa: E501
-            "Logistic Regression": LogisticRegression(**best_params_logistic_regression, class_weight='balanced', max_iter=1000, random_state=42),  # noqa: E501
-            "Random Forest": RandomForestClassifier(**best_params_random_forest, class_weight='balanced', random_state=42),  # noqa: E501
-            "Naive Bayes": ComplementNB(**best_params_naive_bayes)
+            "Gradient Boosting": GradientBoostingClassifier(**best_params.get("Gradient Boosting", {}).get("best_params", {}), random_state=42),
+            "Support Vector Machine": SVC(**best_params.get("Support Vector Machine", {}).get("best_params", {}), class_weight='balanced', kernel='rbf', random_state=42, probability=True),
+            "Logistic Regression": LogisticRegression(**best_params.get("Logistic Regression", {}).get("best_params", {}), class_weight='balanced', max_iter=1000, random_state=42),
+            "Random Forest": RandomForestClassifier(**best_params.get("Random Forest", {}).get("best_params", {}), class_weight='balanced', random_state=42),
+            "Naive Bayes": ComplementNB(**best_params.get("Naive Bayes", {}).get("best_params", {}))
         }
+
         trained_classifiers: Dict[str, object] = {}
         for clf_name, classifier in classifiers.items():
             print(f"Training {clf_name}...")
@@ -67,6 +68,7 @@ class Classifier:
             except Exception as e:
                 print(f"Error occurred while training {clf_name}: {e}")
         return trained_classifiers
+
 
     def evaluate_classifiers(self, trained_classifiers: Dict[str, object], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
         """
