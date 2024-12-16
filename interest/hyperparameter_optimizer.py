@@ -5,13 +5,13 @@ from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import ComplementNB
 from sklearn.feature_extraction.text import TfidfVectorizer
 from pathlib import Path
-import pandas as pd
 from interest.utils import prepare_data
 import json
 import logging
 
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
+
 
 def hyperparameter_optimization(classifiers, param_grid, X_train, y_train):
     """
@@ -43,6 +43,7 @@ def hyperparameter_optimization(classifiers, param_grid, X_train, y_train):
         logger.info(f"Best cross-validation score: {grid_search.best_score_}\n")
 
     return results
+
 
 def run_optimization_pipeline(data_dir, binary_labels):
     """Execute the hyperparameter optimization pipeline."""
@@ -78,8 +79,7 @@ def run_optimization_pipeline(data_dir, binary_labels):
         }
     }
 
-    train_data, _, _, train_labels, _, _ = prepare_data (data_dir, binary_labels)
-
+    train_data, _, _, train_labels, _, _ = prepare_data(data_dir, binary_labels)
 
     vectorizer = TfidfVectorizer()
     X_train = vectorizer.fit_transform(train_data)
@@ -88,9 +88,8 @@ def run_optimization_pipeline(data_dir, binary_labels):
     results_file = "hyperparameter_results.json"
     with open(results_file, 'w') as f:
         json.dump(results, f, indent=4)
-    
-    logger.info(f"Hyperparameter optimization results saved to {results_file}")
 
+    logger.info(f"Hyperparameter optimization results saved to {results_file}")
 
     for clf_name, res in results.items():
         logger.info(f"{clf_name} Results: {res}")
