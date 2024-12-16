@@ -41,16 +41,16 @@ class TextPreprocessor:
         """
         Preprocesses the text by removing non-ASCII characters, converting to lowercase,
         and handling negations within a window.
-        
+
         Args:
-            text (str): The raw text to be processed. 
+            text (str): The raw text to be processed.
             full_preprocessing (bool): If True, applies full preprocessing suitable for traditional models.
             If False, applies mild preprocessing for BERT.
-        
+
         Returns:
             str: The preprocessed text.
         """
-        
+
         if not full_preprocessing:
             if not isinstance(text, str):
                 text = ""
@@ -63,7 +63,7 @@ class TextPreprocessor:
         if full_preprocessing:
             if not isinstance(text, str):
                 text = ""
-            
+
             # Handling negations within a window (next 2 words after the negation)
             negations = ['niet', 'geen', 'nooit', 'niets', 'noch', 'niemand', 'nochthans', 'ondertussen', 'zonder']
             words = text.split()
@@ -75,7 +75,7 @@ class TextPreprocessor:
                 if word in negations:
                     # Add NEG_ prefix to the negation word itself
                     processed_words.append(f"NEG_{word}")
-                    
+
                     # Also add NEG_ prefix to the next 2 words (window)
                     for j in range(i + 1, min(i + 2, len(words))):  # Window of 2
                         processed_words.append(f"NEG_{words[j]}")
@@ -85,7 +85,7 @@ class TextPreprocessor:
                     i += 1
 
             text = ' '.join(processed_words)
-            
+
             # Standard preprocessing steps
             if self.remove_non_ascii:
                 text = re.sub(r'[^\x00-\x7F]+', '', text)
@@ -106,8 +106,6 @@ class TextPreprocessor:
                 text = ' '.join(self.lemmatizer.lemmatize(word) for word in text.split())
 
         return text
-
-
 
     def tokenize(self, text: str) -> dict:
         """
