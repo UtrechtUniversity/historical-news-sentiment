@@ -1,4 +1,3 @@
-import pandas as pd
 from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
@@ -9,9 +8,8 @@ from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union
 from lime.lime_text import LimeTextExplainer
-import shap
 import spacy
-import json
+
 
 class Classifier:
     """
@@ -68,7 +66,6 @@ class Classifier:
             except Exception as e:
                 print(f"Error occurred while training {clf_name}: {e}")
         return trained_classifiers
-
 
     def evaluate_classifiers(self, trained_classifiers: Dict[str, object], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
         """
@@ -189,8 +186,8 @@ class Classifier:
 
         Returns:
         - None
-        """  
-        
+        """
+
         print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")
 
         explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])
@@ -213,6 +210,7 @@ class Classifier:
             except Exception as e:
                 print(f"Error occurred while explaining with LIME for {clf_name}: {e}")
 
+
 if __name__ == "__main__":
     classifier = Classifier()
     corpus = ["Dit is geen goede dag", "Ik heb geen idee"]
@@ -228,3 +226,5 @@ if __name__ == "__main__":
     # classifier = Classifier()
     # classifier.train_and_evaluate_classifiers(text_set, labels)
 
+# TODO
+# Add evaluation set
