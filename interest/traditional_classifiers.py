@@ -209,22 +209,3 @@ class Classifier:
                 explanation.save_to_file(f"{clf_name}_lime_explanation.html")  # Save as HTML
             except Exception as e:
                 print(f"Error occurred while explaining with LIME for {clf_name}: {e}")
-
-
-if __name__ == "__main__":
-    classifier = Classifier()
-    corpus = ["Dit is geen goede dag", "Ik heb geen idee"]
-    X = classifier.vectorizer.fit_transform(corpus)
-    print(classifier.vectorizer.get_feature_names_out())
-
-    # df = pd.read_csv("../data/merged/combined_df.csv")
-    # df = df[['date', 'newspaper_publisher', 'newspaper_title', 'text', 'decade', 'year', 'fuel', 'final_label']]
-    # df['binary_label'] = df['final_label'].replace(0, 1)
-    # df['binary_label'] = df['final_label'].replace(-1, 0)
-    # text_set = df['text']
-    # labels = df['binary_label']
-    # classifier = Classifier()
-    # classifier.train_and_evaluate_classifiers(text_set, labels)
-
-# TODO
-# Add evaluation set
