@@ -1,15 +1,9 @@
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
 from sklearn.linear_model import LogisticRegression  # type: ignore
-from sklearn.ensemble import (  # type: ignore
-    RandomForestClassifier,
-    GradientBoostingClassifier
-   )
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier  # type: ignore  # noqa:E501
 from sklearn.svm import SVC  # type: ignore
 from sklearn.naive_bayes import ComplementNB  # type: ignore
-from sklearn.metrics import (  # type: ignore
-    classification_report,
-    confusion_matrix
-  )
+from sklearn.metrics import classification_report, confusion_matrix  # type: ignore  # noqa:E501
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union, Any
