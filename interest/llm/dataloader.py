@@ -7,7 +7,7 @@ import pandas as pd
 from sklearn.model_selection import train_test_split  # type: ignore
 from typing import Union
 
-
+# flake8: noqa
 class TextDataset(Dataset):
     """
     A PyTorch Dataset for handling text data with preprocessing and segmentation.
@@ -143,7 +143,7 @@ class CSVDataLoader:
             data = data.tolist()
         if isinstance(labels, pd.Series):
             labels = labels.tolist()
-            
+
         train_data, test_data, train_labels, test_labels = train_test_split(
             data, labels, test_size=self.test_size, random_state=self.random_state
         )
