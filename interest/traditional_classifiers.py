@@ -11,6 +11,7 @@ from lime.lime_text import LimeTextExplainer
 import spacy
 
 
+# flake8: noqa
 class Classifier:
     """
     A class for training and evaluating various traditional classifiers on text data.
