@@ -93,8 +93,3 @@ def run_optimization_pipeline(data_dir, binary_labels):
 
     for clf_name, res in results.items():
         logger.info(f"{clf_name} Results: {res}")
-
-
-if __name__ == '__main__':
-    data_dir = Path("../data/merged")
-    run_optimization_pipeline(data_dir=data_dir, binary_labels=True)
