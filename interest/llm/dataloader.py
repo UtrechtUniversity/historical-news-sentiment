@@ -4,12 +4,14 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split  # type: ignore
+from typing import Union
 
 
 class TextDataset(Dataset):
     """
-    A PyTorch Dataset for handling text data with preprocessing and segmentation.
+    A PyTorch Dataset for handling text data with preprocessing
+    and segmentation.
     """
 
     def __init__(
@@ -30,7 +32,8 @@ class TextDataset(Dataset):
             labels (list): List of corresponding labels.
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
             label_col (str): Name of the column containing labels.
-            method (str): Text segmentation method ('sliding_window' or 'chunking').
+            method (str): Text segmentation method
+                         ('sliding_window' or 'chunking').
             window_size (int): Maximum segment length in tokens.
             stride (int): Step size between windows (only for sliding window).
         """
@@ -48,14 +51,18 @@ class TextDataset(Dataset):
         Tokenizes and segments the input texts using the specified method.
 
         Returns:
-            list[tuple[dict, int]]: A list of tokenized text segments and their labels.
+            list[tuple[dict, int]]: A list of tokenized text segments and
+            their labels.
         """
         tokenized_segments = []
         segment_labels = []
 
         for text, label in zip(self.texts, self.labels):
             segments = self.preprocessor.preprocess_and_split(
-                text, method=self.method, window_size=self.window_size, stride=self.stride
+                text,
+                method=self.method,
+                window_size=self.window_size,
+                stride=self.stride
             )
             for segment in segments:
                 tokens = self.preprocessor.tokenize(segment)
@@ -106,8 +113,10 @@ class CSVDataLoader:
         Args:
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
             csv_files (list[str]): List of paths to CSV files.
-            test_size (float): Proportion of the data to use for testing (default: 0.2).
-            val_size (float): Proportion of the remaining training data to use for validation
+            test_size (float): Proportion of the data to use for
+              testing (default: 0.2).
+            val_size (float): Proportion of the remaining training
+              data to use for validation
              (default: 0.1).
             random_state (int): Random seed for reproducibility (default: 42).
         """
@@ -122,24 +131,36 @@ class CSVDataLoader:
         Loads and concatenates data from all specified CSV files.
 
         Returns:
-            pd.DataFrame: A concatenated DataFrame containing data from all CSV files.
+            pd.DataFrame: A concatenated DataFrame containing data
+              from all CSV files.
         """
         dataframes = [pd.read_csv(file) for file in self.csv_files]
         return pd.concat(dataframes)
 
-    def split_data(self, data: list, labels: list) -> tuple:
+    def split_data(self,
+                   data: Union[list, pd.Series],
+                   labels: Union[list, pd.Series]) -> tuple:
         """
         Splits the data into training, validation, and test sets.
 
         Args:
-            data (list): List of text data.
-            labels (list): List of corresponding labels.
+            data (Union[list, pd.Series]): List or pandas Series
+              of text data.
+            labels (Union[list, pd.Series]): List or pandas Series
+              of corresponding labels.
 
         Returns:
-            tuple: Training, validation, and test datasets and their respective labels.
+            tuple: Training, validation, and test datasets and their
+              respective labels.
         """
+        if isinstance(data, pd.Series):
+            data = data.tolist()
+        if isinstance(labels, pd.Series):
+            labels = labels.tolist()
+
         train_data, test_data, train_labels, test_labels = train_test_split(
-            data, labels, test_size=self.test_size, random_state=self.random_state
+            data, labels, test_size=self.test_size,
+            random_state=self.random_state
         )
         train_data, val_data, train_labels, val_labels = train_test_split(
             train_data,
@@ -147,7 +168,8 @@ class CSVDataLoader:
             test_size=self.val_size / (1 - self.test_size),
             random_state=self.random_state,
         )
-        return train_data, val_data, test_data, train_labels, val_labels, test_labels
+        return (train_data, val_data, test_data,
+                train_labels, val_labels, test_labels)
 
     def create_datasets(
         self,
@@ -163,21 +185,23 @@ class CSVDataLoader:
         Args:
             label_col (str): Name of the column containing labels.
             text_col (str): Name of the column containing text data.
-            method (str): Text segmentation method ('sliding_window' or 'chunking').
+            method (str): Text segmentation method
+              ('sliding_window' or 'chunking').
             window_size (int): Maximum segment length in tokens.
             stride (int): Step size between windows (only for sliding window).
 
         Returns:
-            tuple[TextDataset, TextDataset, TextDataset]: Training, validation, and test datasets.
+            tuple[TextDataset, TextDataset, TextDataset]:
+              Training, validation, and test datasets.
         """
         data = self.load_data()
         labels = data[label_col].values
         texts = data[text_col].values
 
-        train_texts, val_texts, test_texts, train_labels, val_labels, test_labels = (
+        train_texts, val_texts, test_texts, train_labels, val_labels, test_labels = (   # noqa: E501
             self.split_data(
                 texts.tolist() if hasattr(texts, 'tolist') else list(texts),
-                labels.tolist() if hasattr(labels, 'tolist') else list(labels)))
+                labels.tolist() if hasattr(labels, 'tolist') else list(labels)))   # noqa: E501
 
         train_dataset = TextDataset(
             train_texts, train_labels, self.preprocessor, label_col,
