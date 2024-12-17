@@ -1,9 +1,15 @@
 from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
 from sklearn.linear_model import LogisticRegression  # type: ignore
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier  # type: ignore
+from sklearn.ensemble import (  # type: ignore
+    RandomForestClassifier,
+    GradientBoostingClassifier
+   )
 from sklearn.svm import SVC  # type: ignore
 from sklearn.naive_bayes import ComplementNB  # type: ignore
-from sklearn.metrics import classification_report, confusion_matrix  # type: ignore
+from sklearn.metrics import (  # type: ignore
+    classification_report,
+    confusion_matrix
+  )
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union, Any
@@ -11,10 +17,10 @@ from lime.lime_text import LimeTextExplainer  # type: ignore
 import spacy
 
 
-# flake8: noqa
 class Classifier:
     """
-    A class for training and evaluating various traditional classifiers on text data.
+    A class for training and evaluating various traditional
+    classifiers on text data.
     """
 
     def __init__(self) -> None:
@@ -30,7 +36,12 @@ class Classifier:
             spacy.cli.download('nl_core_news_sm')  # type: ignore
             self.nlp = spacy.load('nl_core_news_sm')
 
-    def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:
+    def train_classifiers(
+        self,
+        text_train_vectorized: Union[List[str], List[int], List[float]],
+        label_train: Union[List[str], List[int], List[float]],
+    ) -> Dict[str, object]:
+
         """
         Train multiple classifiers on the training data.
 
@@ -47,15 +58,37 @@ class Classifier:
             with open('hyperparameter_results.json', 'r') as f:
                 best_params = json.load(f)
         except FileNotFoundError:
-            print("Best parameters file not found. Ensure hyperparameter optimization is completed.")
+            print("Best parameters file not found. Ensure hyperparameter "
+                  "optimization is completed.")
+
             return {}
 
         classifiers: Dict[str, Any] = {
-            "Gradient Boosting": GradientBoostingClassifier(**best_params.get("Gradient Boosting", {}).get("best_params", {}), random_state=42),
-            "Support Vector Machine": SVC(**best_params.get("Support Vector Machine", {}).get("best_params", {}), class_weight='balanced', kernel='rbf', random_state=42, probability=True),
-            "Logistic Regression": LogisticRegression(**best_params.get("Logistic Regression", {}).get("best_params", {}), class_weight='balanced', max_iter=1000, random_state=42),
-            "Random Forest": RandomForestClassifier(**best_params.get("Random Forest", {}).get("best_params", {}), class_weight='balanced', random_state=42),
-            "Naive Bayes": ComplementNB(**best_params.get("Naive Bayes", {}).get("best_params", {}))
+            "Gradient Boosting": GradientBoostingClassifier(
+                **best_params.get("Gradient Boosting", {}).get("best_params", {}),  # noqa:E501
+                random_state=42,
+            ),
+            "Support Vector Machine": SVC(
+                **best_params.get("Support Vector Machine", {}).get("best_params", {}),  # noqa:E501
+                class_weight="balanced",
+                kernel="rbf",
+                random_state=42,
+                probability=True,
+            ),
+            "Logistic Regression": LogisticRegression(
+                **best_params.get("Logistic Regression", {}).get("best_params", {}),  # noqa:E501
+                class_weight="balanced",
+                max_iter=1000,
+                random_state=42,
+            ),
+            "Random Forest": RandomForestClassifier(
+                **best_params.get("Random Forest", {}).get("best_params", {}),
+                class_weight="balanced",
+                random_state=42,
+            ),
+            "Naive Bayes": ComplementNB(
+                **best_params.get("Naive Bayes", {}).get("best_params", {})
+            ),
         }
 
         trained_classifiers: Dict[str, Any] = {}
@@ -176,7 +209,8 @@ class Classifier:
         except Exception as e:
             print(f"Error occurred during training and evaluation: {e}")
 
-    def explain_with_lime(self, trained_classifiers: Dict[str, object], text_sample: str, label_sample: int) -> None:
+    def explain_with_lime(self, trained_classifiers: Dict[str, object],
+                          text_sample: str, label_sample: int) -> None:
         """
         Use LIME to explain the predictions of each classifier.
 
@@ -189,24 +223,22 @@ class Classifier:
         - None
         """
 
-        print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")
+        print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")  # noqa:E501
 
         explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])
         for clf_name, classifier in trained_classifiers.items():
             print(f"\nExplaining prediction for {clf_name}...\n")
             try:
-                # Define a prediction function for LIME
                 def predict_proba(texts):
                     vectorized_texts = self.vectorizer.transform(texts)
                     return classifier.predict_proba(vectorized_texts)
 
-                # Generate explanation
                 explanation = explainer.explain_instance(
                     text_sample,
                     predict_proba,
-                    num_features=10  # Number of features to explain
+                    num_features=10
                 )
-                explanation.show_in_notebook()  # Visualize in notebook
-                explanation.save_to_file(f"{clf_name}_lime_explanation.html")  # Save as HTML
+                explanation.show_in_notebook()
+                explanation.save_to_file(f"{clf_name}_lime_explanation.html")
             except Exception as e:
-                print(f"Error occurred while explaining with LIME for {clf_name}: {e}")
+                print(f"Error occurred while explaining with LIME for {clf_name}: {e}")  # noqa:E501

@@ -10,24 +10,29 @@ import nltk  # type: ignore
 
 nltk.download('stopwords')
 
-# flake8: noqa
+
 class TextPreprocessor:
     """
-    A class to preprocess and tokenize text data, with support for text cleaning, segmentation,
-    and tokenization.
+    A class to preprocess and tokenize text data, with
+      support for text cleaning, segmentation, and
+      tokenization.
     """
 
     def __init__(self, model_name: str, max_length: int, lowercase: bool,
-                 remove_non_ascii: bool = True, use_stemming: bool = False, use_lemmatization: bool = False):
+                 remove_non_ascii: bool = True, use_stemming: bool = False,
+                 use_lemmatization: bool = False):
         """
         Initializes the TextPreprocessor.
 
         Args:
             model_name (str): Name of the pre-trained model for tokenization.
             max_length (int): Maximum sequence length for tokenization.
-            lowercase (bool): Flag to indicate if text should be converted to lowercase.
-            remove_non_ascii (bool, optional): Flag to remove non-ASCII characters from text.
-            use_stemming (bool, optional): Flag to apply stemming on text for traditional models.
+            lowercase (bool): Flag to indicate if text should be converted to
+             lowercase.
+            remove_non_ascii (bool, optional): Flag to remove non-ASCII
+              characters from text.
+            use_stemming (bool, optional): Flag to apply stemming on text
+              for traditional models.
             use_lemmatization (bool, optional): Flag to apply lemmatization o
         """
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
@@ -38,14 +43,17 @@ class TextPreprocessor:
         self.stemmer = SnowballStemmer("dutch") if use_stemming else None
         self.lemmatizer = WordNetLemmatizer() if use_lemmatization else None
 
-    def preprocess_text(self, text: str, full_preprocessing: bool = False) -> str:
+    def preprocess_text(self, text: str,
+                        full_preprocessing: bool = False) -> str:
         """
-        Preprocesses the text by removing non-ASCII characters, converting to lowercase,
-        and handling negations within a window.
+        Preprocesses the text by removing non-ASCII characters,
+        converting to lowercase, and handling negations within
+        a window.
 
         Args:
             text (str): The raw text to be processed.
-            full_preprocessing (bool): If True, applies full preprocessing suitable for traditional models.
+            full_preprocessing (bool): If True, applies
+              full preprocessing suitable for traditional models.
             If False, applies mild preprocessing for BERT.
 
         Returns:
@@ -65,8 +73,8 @@ class TextPreprocessor:
             if not isinstance(text, str):
                 text = ""
 
-            # Handling negations within a window (next 2 words after the negation)
-            negations = ['niet', 'geen', 'nooit', 'niets', 'noch', 'niemand', 'nochthans', 'ondertussen', 'zonder']
+            negations = ['niet', 'geen', 'nooit', 'niets', 'noch',
+                         'niemand', 'nochthans', 'ondertussen', 'zonder']
             words = text.split()
             processed_words = []
 
@@ -78,39 +86,39 @@ class TextPreprocessor:
                     processed_words.append(f"NEG_{word}")
 
                     # Also add NEG_ prefix to the next 2 words (window)
-                    for j in range(i + 1, min(i + 2, len(words))):  # Window of 2
+                    for j in range(i + 1, min(i + 2, len(words))):
                         processed_words.append(f"NEG_{words[j]}")
-                    i += 3  # Skip the next two words since they were already processed
+                    i += 3
                 else:
                     processed_words.append(word)
                     i += 1
 
             text = ' '.join(processed_words)
 
-            # Standard preprocessing steps
             if self.remove_non_ascii:
                 text = re.sub(r'[^\x00-\x7F]+', '', text)
             if self.lowercase:
                 text = text.lower()
 
-            text = re.sub(r'[^\w\s]', '', text)  # Remove punctuation
-            text = ' '.join(text.split())  # Normalize spaces
+            text = re.sub(r'[^\w\s]', '', text)
+            text = ' '.join(text.split())
 
             if not self.stopwords:
                 self.stopwords = set(stopwords.words('dutch'))
-            # Remove stopwords, except negation words
-            text = ' '.join(word for word in text.split() if word not in self.stopwords or word in negations)
+            text = ' '.join(word for word in text.split() if word
+                            not in self.stopwords or word in negations)
 
             if self.stemmer:
-                text = ' '.join(self.stemmer.stem(word) for word in text.split())
+                text = ' '.join(self.stemmer.stem(word) for word in text.split())   # noqa: E501
             elif self.lemmatizer:
-                text = ' '.join(self.lemmatizer.lemmatize(word) for word in text.split())
+                text = ' '.join(self.lemmatizer.lemmatize(word) for word in text.split())   # noqa: E501
 
         return text
 
     def tokenize(self, text: str) -> dict:
         """
-        Tokenizes the preprocessed text into tokens and returns them as tensors.
+        Tokenizes the preprocessed text into tokens and returns them
+        as tensors.
 
         Args:
             text (str): The preprocessed text to be tokenized.
@@ -126,9 +134,13 @@ class TextPreprocessor:
             return_tensors='pt'
         )
 
-    def apply_sliding_window(self, text: str, window_size: int, stride: int) -> list[str]:
+    def apply_sliding_window(self,
+                             text: str,
+                             window_size: int,
+                             stride: int) -> list[str]:
         """
-        Segments the text into overlapping windows of words with a specified stride.
+        Segments the text into overlapping windows of words
+        with a specified stride.
 
         Args:
             text (str): The preprocessed text to be split into windows.
@@ -158,9 +170,9 @@ class TextPreprocessor:
             list[str]: List of text chunks (substrings of the original text).
         """
         words = text.split()
-        return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]
+        return [" ".join(words[i:i + chunk_size]) for i in range(0, len(words), chunk_size)]   # noqa: E501
 
-    def preprocess_and_split(self, text: str, method: str, window_size: int, stride: int) -> (
+    def preprocess_and_split(self, text: str, method: str, window_size: int, stride: int) -> (   # noqa: E501
             list)[str]:
         """
         Preprocesses the text and splits it based on the specified method
@@ -168,12 +180,16 @@ class TextPreprocessor:
 
         Args:
             text (str): The raw text to be preprocessed and split.
-            method (str): The segmentation method ('sliding_window' or 'chunking').
-            window_size (int): The size of the sliding window or chunk (in words).
-            stride (int): The stride for sliding window segmentation (ignored for chunking).
+            method (str): The segmentation method ('sliding_window'
+            or 'chunking').
+            window_size (int): The size of the sliding window or
+            chunk (in words).
+            stride (int): The stride for sliding window segmentation
+            (ignored for chunking).
 
         Returns:
-            list[str]: A list of text segments based on the chosen segmentation method.
+            list[str]: A list of text segments based on the chosen
+            segmentation method.
 
         Raises:
             ValueError: If an unknown method is provided.
@@ -181,8 +197,8 @@ class TextPreprocessor:
         preprocessed_text = self.preprocess_text(text)
 
         if method == 'sliding_window':
-            return self.apply_sliding_window(preprocessed_text, window_size, stride)
+            return self.apply_sliding_window(preprocessed_text, window_size, stride)   # noqa: E501
         if method == 'chunking':
             return self.apply_chunking(preprocessed_text, window_size)
 
-        raise ValueError("Unknown method: choose either 'sliding_window' or 'chunking'")
+        raise ValueError("Unknown method: choose either 'sliding_window' or 'chunking'")   # noqa: E501
