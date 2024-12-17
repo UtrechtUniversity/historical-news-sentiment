@@ -1,4 +1,5 @@
-"""Script for preprocessing, tokenizing, and segmenting text data using various methods
+"""Script for preprocessing, tokenizing,
+and segmenting text data using various methods
 like sliding window and chunking."""
 import re
 from transformers import AutoTokenizer
@@ -9,7 +10,7 @@ import nltk
 
 nltk.download('stopwords')
 
-
+# flake8: noqa
 class TextPreprocessor:
     """
     A class to preprocess and tokenize text data, with support for text cleaning, segmentation,
