@@ -8,6 +8,8 @@ from interest.utils import prepare_data
 import json
 import logging
 
+
+# flake8: noqa
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
