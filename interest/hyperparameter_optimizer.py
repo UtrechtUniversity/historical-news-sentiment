@@ -4,7 +4,6 @@ from sklearn.svm import SVC
 from sklearn.linear_model import LogisticRegression
 from sklearn.naive_bayes import ComplementNB
 from sklearn.feature_extraction.text import TfidfVectorizer
-from pathlib import Path
 from interest.utils import prepare_data
 import json
 import logging
