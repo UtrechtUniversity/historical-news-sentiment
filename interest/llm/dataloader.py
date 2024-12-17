@@ -4,7 +4,8 @@ from pathlib import Path
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
-from sklearn.model_selection import train_test_split
+from sklearn.model_selection import train_test_split  # type: ignore
+from typing import Union
 
 
 class TextDataset(Dataset):
@@ -127,17 +128,22 @@ class CSVDataLoader:
         dataframes = [pd.read_csv(file) for file in self.csv_files]
         return pd.concat(dataframes)
 
-    def split_data(self, data: list, labels: list) -> tuple:
+    def split_data(self, data: Union[list, pd.Series], labels: Union[list, pd.Series]) -> tuple:
         """
         Splits the data into training, validation, and test sets.
 
         Args:
-            data (list): List of text data.
-            labels (list): List of corresponding labels.
+            data (Union[list, pd.Series]): List or pandas Series of text data.
+            labels (Union[list, pd.Series]): List or pandas Series of corresponding labels.
 
         Returns:
             tuple: Training, validation, and test datasets and their respective labels.
         """
+        if isinstance(data, pd.Series):
+            data = data.tolist()
+        if isinstance(labels, pd.Series):
+            labels = labels.tolist()
+            
         train_data, test_data, train_labels, test_labels = train_test_split(
             data, labels, test_size=self.test_size, random_state=self.random_state
         )

@@ -1,10 +1,10 @@
-from sklearn.model_selection import GridSearchCV
-from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier
-from sklearn.svm import SVC
-from sklearn.linear_model import LogisticRegression
-from sklearn.naive_bayes import ComplementNB
-from sklearn.feature_extraction.text import TfidfVectorizer
-from interest.utils import prepare_data
+from sklearn.model_selection import GridSearchCV  # type: ignore
+from sklearn.ensemble import GradientBoostingClassifier, RandomForestClassifier  # type: ignore
+from sklearn.svm import SVC  # type: ignore
+from sklearn.linear_model import LogisticRegression  # type: ignore
+from sklearn.naive_bayes import ComplementNB  # type: ignore
+from sklearn.feature_extraction.text import TfidfVectorizer   # type: ignore
+from interest.utils import prepare_data   # type: ignore
 import json
 import logging
 
@@ -81,6 +81,8 @@ def run_optimization_pipeline(data_dir, binary_labels):
     }
 
     train_data, _, _, train_labels, _, _ = prepare_data(data_dir, binary_labels)
+    # train_data = train_data.tolist()
+    # train_labels = train_labels.tolist()
 
     vectorizer = TfidfVectorizer()
     X_train = vectorizer.fit_transform(train_data)

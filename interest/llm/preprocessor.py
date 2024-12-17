@@ -2,11 +2,11 @@
 and segmenting text data using various methods
 like sliding window and chunking."""
 import re
-from transformers import AutoTokenizer
-from nltk.corpus import stopwords
-from nltk.stem import SnowballStemmer
-from nltk.stem import WordNetLemmatizer
-import nltk
+from transformers import AutoTokenizer  # type: ignore
+from nltk.corpus import stopwords  # type: ignore
+from nltk.stem import SnowballStemmer  # type: ignore
+from nltk.stem import WordNetLemmatizer  # type: ignore
+import nltk  # type: ignore
 
 nltk.download('stopwords')
 
@@ -34,7 +34,7 @@ class TextPreprocessor:
         self.max_length = max_length
         self.remove_non_ascii = remove_non_ascii
         self.lowercase = lowercase
-        self.stopwords = set()
+        self.stopwords: set[str] = set()
         self.stemmer = SnowballStemmer("dutch") if use_stemming else None
         self.lemmatizer = WordNetLemmatizer() if use_lemmatization else None
 

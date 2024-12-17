@@ -1,13 +1,13 @@
-from sklearn.feature_extraction.text import TfidfVectorizer
-from sklearn.linear_model import LogisticRegression
-from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier
-from sklearn.svm import SVC
-from sklearn.naive_bayes import ComplementNB
-from sklearn.metrics import classification_report, confusion_matrix
+from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
+from sklearn.linear_model import LogisticRegression  # type: ignore
+from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier  # type: ignore
+from sklearn.svm import SVC  # type: ignore
+from sklearn.naive_bayes import ComplementNB  # type: ignore
+from sklearn.metrics import classification_report, confusion_matrix  # type: ignore
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
-from typing import Tuple, Dict, List, Union
-from lime.lime_text import LimeTextExplainer
+from typing import Tuple, Dict, List, Union, Any
+from lime.lime_text import LimeTextExplainer  # type: ignore
 import spacy
 
 
@@ -27,7 +27,7 @@ class Classifier:
             self.nlp = spacy.load('nl_core_news_sm')
         except OSError:
             print("Model not found. Downloading...")
-            spacy.cli.download('nl_core_news_sm')
+            spacy.cli.download('nl_core_news_sm')  # type: ignore
             self.nlp = spacy.load('nl_core_news_sm')
 
     def train_classifiers(self, text_train_vectorized: Union[List[str], List[int], List[float]], label_train: Union[List[str], List[int], List[float]]) -> Dict[str, object]:
@@ -50,7 +50,7 @@ class Classifier:
             print("Best parameters file not found. Ensure hyperparameter optimization is completed.")
             return {}
 
-        classifiers: Dict[str, object] = {
+        classifiers: Dict[str, Any] = {
             "Gradient Boosting": GradientBoostingClassifier(**best_params.get("Gradient Boosting", {}).get("best_params", {}), random_state=42),
             "Support Vector Machine": SVC(**best_params.get("Support Vector Machine", {}).get("best_params", {}), class_weight='balanced', kernel='rbf', random_state=42, probability=True),
             "Logistic Regression": LogisticRegression(**best_params.get("Logistic Regression", {}).get("best_params", {}), class_weight='balanced', max_iter=1000, random_state=42),
@@ -58,7 +58,7 @@ class Classifier:
             "Naive Bayes": ComplementNB(**best_params.get("Naive Bayes", {}).get("best_params", {}))
         }
 
-        trained_classifiers: Dict[str, object] = {}
+        trained_classifiers: Dict[str, Any] = {}
         for clf_name, classifier in classifiers.items():
             print(f"Training {clf_name}...")
             try:
@@ -68,7 +68,7 @@ class Classifier:
                 print(f"Error occurred while training {clf_name}: {e}")
         return trained_classifiers
 
-    def evaluate_classifiers(self, trained_classifiers: Dict[str, object], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
+    def evaluate_classifiers(self, trained_classifiers: Dict[str, Any], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
         """
         Evaluate trained classifiers on the test data.
 
@@ -162,8 +162,8 @@ class Classifier:
 
             # text_train, text_test, label_train, label_test = self.split_dataset(text_set, labels, binary)  # noqa: E501
 
-            print('label_train counts:', label_train.value_counts())
-            print('label_test counts:', label_test.value_counts())
+            # print('label_train counts:', label_train.value_counts())
+            # print('label_test counts:', label_test.value_counts())
 
             text_train_vectorized = self.vectorizer.fit_transform(text_train)
             text_test_vectorized = self.vectorizer.transform(text_test)
