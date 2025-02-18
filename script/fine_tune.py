@@ -23,10 +23,10 @@ from ray._private.utils import get_ray_temp_dir
 from ray.air import session
 from ray.train import Checkpoint
 
-from config import search_space
-from interest.llm.preprocessor import TextPreprocessor
-from interest.llm.dataloader import CSVDataLoader
-from interest.llm.transformer_trainer import TransformerTrainer
+from config_ray import search_space
+from interest.dataprocessor.preprocessor import TextPreprocessor
+from interest.dataprocessor.dataloader import DataSetCreator
+from interest.sentiment_analyser.transformer_trainer import TransformerTrainer
 
 
 def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
@@ -239,8 +239,10 @@ def parse_arguments() -> argparse.Namespace:
         argparse.Namespace: A namespace containing parsed arguments.
     """
     parser = ArgumentParser(add_help=False)
-    parser.add_argument('--data_dir', type=str, required=True,
-                        help='path to csv files')
+    parser.add_argument('--train_fp', type=str, required=True,
+                        help='path to train set')
+    parser.add_argument('--test_fp', type=str, required=True,
+                        help='path to test set')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='path to output')
     parser.add_argument('--model_name', type=str, required=True,
@@ -253,7 +255,7 @@ def parse_arguments() -> argparse.Namespace:
                         help='model name in huggingface')
     parser.add_argument('--text_field_name', type=str, default='text',
                         help='field name with text')
-    parser.add_argument('--label_field_name', type=str, default='final_label',
+    parser.add_argument('--label_field_name', type=str, default='majority_voting',
                         help='field name with label')
 
     parser.add_argument('--max_length', type=int, default=512,
@@ -295,16 +297,15 @@ def predict(args: argparse.Namespace) -> None:
     Returns:
         None
     """
-    csv_files = list(Path(args.data_dir).glob('*.csv'))
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp = args.test_fp)
 
     _, _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride
+        stride=args.stride, preprocessor=preprocessor
     )
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -357,16 +358,15 @@ def explain_predict(args: argparse.Namespace) -> None:
         )
         return outputs.logits  # Return the logits directly
 
-    csv_files = list(Path(args.data_dir).glob('*.csv'))
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
     _, _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride
+        stride=args.stride, preprocessor = preprocessor
     )
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -458,16 +458,15 @@ def train(args: argparse.Namespace) -> None:
     print('session_dir', session_dir)
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    csv_files = list(Path(args.data_dir).glob('*.csv'))
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+    data_loader = DataSetCreator(train_fp = args.train_fp, test_fp=args.test_fp)
 
     train_dataset, val_dataset, _ = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride
+        stride=args.stride, preprocessor=preprocessor
     )
 
     cpu_count = os.cpu_count()
