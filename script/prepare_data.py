@@ -3,7 +3,7 @@ import yaml
 import logging
 import pandas as pd
 from pathlib import Path
-from typing import Optional, Tuple, Dict
+from typing import Optional, Dict
 from interest.dataprocessor.preprocessor import TextPreprocessor
 from interest.dataprocessor.dataloader import CSVDataLoader
 from interest.utils.logging_utils import setup_logging
@@ -40,7 +40,7 @@ def prepare_data(
     config: Dict, 
     text_col: Optional[str] = None, 
     label_col: Optional[str] = None, 
-    binary_labels: bool = True
+    binary_labels: bool = False
 ) -> None:
     """
     Load and split dataset.
