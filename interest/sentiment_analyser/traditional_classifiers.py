@@ -9,6 +9,14 @@ import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union, Any
 from lime.lime_text import LimeTextExplainer  # type: ignore
 import spacy
+import json
+import logging
+from interest.utils.logging_utils import setup_logging
+
+
+setup_logging()
+logger = logging.getLogger(__name__)
+logger.info("Logging initialized")
 
 
 class Classifier:
@@ -26,8 +34,8 @@ class Classifier:
         try:
             self.nlp = spacy.load('nl_core_news_sm')
         except OSError:
-            print("Model not found. Downloading...")
-            spacy.cli.download('nl_core_news_sm')  # type: ignore
+            logger.info("Model not found. Downloading...")
+            spacy.cli.download('nl_core_news_sm')  # type: ignor
             self.nlp = spacy.load('nl_core_news_sm')
 
     def train_classifiers(
@@ -46,13 +54,12 @@ class Classifier:
         Returns:
         - Dict: Trained classifiers.
         """
-        import json
 
         try:
             with open('hyperparameter_results.json', 'r') as f:
                 best_params = json.load(f)
         except FileNotFoundError:
-            print("Best parameters file not found. Ensure hyperparameter "
+            logger.info("Best parameters file not found. Ensure hyperparameter "
                   "optimization is completed.")
 
             return {}
@@ -92,7 +99,7 @@ class Classifier:
                 classifier.fit(text_train_vectorized, label_train)
                 trained_classifiers[clf_name] = classifier
             except Exception as e:
-                print(f"Error occurred while training {clf_name}: {e}")
+                logger.info(f"Error occurred while training {clf_name}: {e}")
         return trained_classifiers
 
     def evaluate_classifiers(self, trained_classifiers: Dict[str, Any], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
@@ -118,7 +125,7 @@ class Classifier:
                 fpr_all.append(fpr)
                 tpr_all.append(tpr)
             except Exception as e:
-                print(f"Error occurred while evaluating {clf_name}: {e}")
+                logger.info(f"Error occurred while evaluating {clf_name}: {e}")
         return fpr_all, tpr_all
 
     def print_evaluation_metrics(self, label_test: Union[List[str], List[int], List[float]], label_predicted: Union[List[str], List[int], List[float]]) -> None:  # noqa: E501
@@ -145,7 +152,7 @@ class Classifier:
             print(f"AUC-ROC: {auc_roc:.4f}")
             print('\n', '******************************************', '\n')
         except Exception as e:
-            print(f"Error occurred while printing evaluation metrics: {e}")
+            logger.info(f"Error occurred while printing evaluation metrics: {e}")
 
     def plot_roc_curves(self, fpr_all: List[float], tpr_all: List[float], classifiers: Dict[str, object]) -> None:  # noqa: E501
         """
@@ -172,7 +179,7 @@ class Classifier:
             plt.legend(loc="lower right")
             plt.show()
         except Exception as e:
-            print(f"Error occurred while plotting ROC curves: {e}")
+            logger.info(f"Error occurred while plotting ROC curves: {e}")
 
     def train_and_evaluate_classifiers(self, text_train, text_test, label_train, label_test, binary: bool = True) -> None:  # noqa: E501
         """
@@ -201,7 +208,7 @@ class Classifier:
 
             self.plot_roc_curves(fpr_all, tpr_all, trained_classifiers)
         except Exception as e:
-            print(f"Error occurred during training and evaluation: {e}")
+            logger.info(f"Error occurred during training and evaluation: {e}")
 
     def explain_with_lime(self, trained_classifiers: Dict[str, object],
                           text_sample: str, label_sample: int) -> None:
@@ -235,4 +242,4 @@ class Classifier:
                 explanation.show_in_notebook()
                 explanation.save_to_file(f"{clf_name}_lime_explanation.html")
             except Exception as e:
-                print(f"Error occurred while explaining with LIME for {clf_name}: {e}")  # noqa:E501
+                logger.info(f"Error occurred while explaining with LIME for {clf_name}: {e}")  # noqa:E501
