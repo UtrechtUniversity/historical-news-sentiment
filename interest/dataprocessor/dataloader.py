@@ -5,7 +5,7 @@ import torch
 from torch.utils.data import Dataset
 import pandas as pd
 from sklearn.model_selection import train_test_split  # type: ignore
-from typing import Union
+from typing import Tuple
 
 
 class TextDataset(Dataset):
@@ -111,8 +111,6 @@ class CSVDataLoader:
             csv_files (list[str]): Paths to CSV file.
             test_size (float): Proportion of the data to use for
               testing (default: 0.2).
-              data to use for validation
-             (default: 0.1).
             random_state (int): Random seed for reproducibility (default: 42).
         """
         self.test_size = test_size
@@ -126,34 +124,30 @@ class CSVDataLoader:
         return dataframes
 
     def split_data(self,
-                   data: Union[list, pd.Series],
-                   labels: Union[list, pd.Series]) -> tuple:
+               data: pd.DataFrame,
+               labels: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
-        Splits the data into training, validation, and test sets.
+        Splits the data into training and test sets and returns them as DataFrames.
 
         Args:
-            data (Union[list, pd.Series]): List or pandas Series
-              of text data.
-            labels (Union[list, pd.Series]): List or pandas Series
-              of corresponding labels.
+            data (pd.DataFrame): pandas DataFrame containing the text data.
+            labels (Union[pd.Series, pd.DataFrame]): pandas Series or DataFrame of corresponding labels.
 
         Returns:
-            tuple: Training, and test datasets and their
-              respective labels.
+            tuple: Training and test dataframes and their respective labels as DataFrames.
         """
-        if isinstance(data, pd.Series):
-            data = data.tolist()
-        if isinstance(labels, pd.Series):
-            labels = labels.tolist()
-
+        # Split the data into train and test sets
         train_data, test_data, train_labels, test_labels = train_test_split(
-            data, labels, test_size=self.test_size,
-            random_state=self.random_state
+            data, labels, test_size=self.test_size, random_state=self.random_state
         )
-    
-        return (train_data, test_data,
-                train_labels, test_labels)
+        
+        # Convert the data and labels into DataFrames
+        train_df = pd.DataFrame(train_data)
+        train_df['label'] = train_labels
+        test_df = pd.DataFrame(test_data)
+        test_df['label'] = test_labels
 
+        return train_df, test_df
 
 class DataSetCreator:
     """
