@@ -28,7 +28,9 @@ dependencies = [
     "scikit-learn",
     "torch",
     "transformers",
-    "ray"
+    "ray",
+    "ray[tune]",
+    "captum"
 ]
 
 [project.optional-dependencies]
