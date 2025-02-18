@@ -7,6 +7,7 @@ from typing import Optional, Tuple, Dict
 from interest.dataprocessor.preprocessor import TextPreprocessor
 from interest.dataprocessor.dataloader import CSVDataLoader
 from interest.utils.logging_utils import setup_logging
+import os
 
 
 setup_logging()
@@ -22,7 +23,7 @@ def load_config(config_path: Path) -> Dict:
 
     with config_path.open("r") as f:
         return yaml.safe_load(f)
-
+    
 def get_preprocessor(config: Dict) -> TextPreprocessor:
     """Initialize and return a text preprocessor instance."""
     return TextPreprocessor(
@@ -34,14 +35,15 @@ def get_preprocessor(config: Dict) -> TextPreprocessor:
     )
 
 def prepare_data(
-    data_dir: Path, 
+    input_fp: Path,
+    output_dir: Path,
     config: Dict, 
     text_col: Optional[str] = None, 
     label_col: Optional[str] = None, 
     binary_labels: bool = True
-) -> Tuple[pd.Series, pd.Series]:
+) -> None:
     """
-    Load, preprocess, and split dataset.
+    Load and split dataset.
 
     Args:
         data_dir (Path): Directory containing CSV files.
@@ -61,41 +63,48 @@ def prepare_data(
     if label_col is None:
         label_col = config["data"]["label_column"]
 
-    csv_files = list(data_dir.glob("*.csv"))
-    if not csv_files:
-        logging.error(f"No CSV files found in: {data_dir}")
-        raise FileNotFoundError(f"No CSV files found in directory: {data_dir}")
-
-    preprocessor = get_preprocessor(config)
-    loader = CSVDataLoader(preprocessor, csv_files=csv_files)
-    dataset = loader.load_data()
+    loader = CSVDataLoader()
+    dataset = loader.load_data(data_fp=input_fp)
+    logging.info(f"Data is loaded. Shape of dataset: {dataset.shape} .")
 
     if binary_labels:
-        dataset["binary_label"] = dataset[label_col].replace(2, 1)
+        dataset["binary_label"] = dataset[label_col].replace(0, 1)
         dataset.dropna(subset=["binary_label"], inplace=True)
         label_col = "binary_label"
 
+    preprocessor = get_preprocessor(config)
     dataset["processed_text"] = dataset[text_col].apply(
         lambda x: preprocessor.preprocess_text(x, full_preprocessing=True)
     )
-
     logging.info(f"Data preprocessing completed. Processed {len(dataset)} rows.")
-    
-    return dataset["processed_text"], dataset[label_col]
 
-def parse_arguments() -> Path:
+    train_dataset, test_dataset = loader.split_data(data=dataset.drop(columns=[label_col]), labels=dataset[label_col])
+    os.makedirs(output_dir, exist_ok=True)
+    train_dataset.to_csv(os.path.join(output_dir, 'train_dataset.csv'), index=False)
+    test_dataset.to_csv(os.path.join(output_dir, 'test_dataset.csv'), index=False)
+    logging.info(f"Data spliting completed. Shape of trainset: {train_dataset.shape} and the shape of testset is: {test_dataset.shape}")
+
+    
+def parse_arguments() -> tuple[Path, Path]:
     parser = argparse.ArgumentParser(description="Load and preprocess text data.")
     parser.add_argument(
-        "--data_dir", 
+        "--data_fp",  
         type=str, 
         default="data/", 
-        help="Path to the data directory containing CSV files."
+        help="Path to the input data file path."
+    )
+    parser.add_argument(
+        "--output_dir",  
+        type=str, 
+        default="output/", 
+        help="Path to the output directory."
     )
     args = parser.parse_args()
-    return Path(args.data_dir)
+    return Path(args.data_fp), Path(args.output_dir)
 
 if __name__ == "__main__":
-    data_dir = parse_arguments()
+    data_fp, output_dir = parse_arguments()
     config = load_config(CONFIG_PATH)
-    processed_text, labels = prepare_data(data_dir, config)
+    prepare_data(data_fp, output_dir, config)
+
     logging.info("Data processing completed successfully.")
