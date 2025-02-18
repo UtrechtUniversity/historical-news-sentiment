@@ -7,6 +7,12 @@ from nltk.corpus import stopwords  # type: ignore
 from nltk.stem import SnowballStemmer  # type: ignore
 from nltk.stem import WordNetLemmatizer  # type: ignore
 import nltk  # type: ignore
+from interest.utils.logging_utils import setup_logging
+import logging
+
+
+setup_logging()
+logging.info("Logging initialized")
 
 nltk.download('stopwords')
 
@@ -35,6 +41,7 @@ class TextPreprocessor:
               for traditional models.
             use_lemmatization (bool, optional): Flag to apply lemmatization o
         """
+        logging.info("Initializing TextPreprocessor with model: %s", model_name)
         self.tokenizer = AutoTokenizer.from_pretrained(model_name)
         self.max_length = max_length
         self.remove_non_ascii = remove_non_ascii
@@ -42,6 +49,7 @@ class TextPreprocessor:
         self.stopwords: set[str] = set()
         self.stemmer = SnowballStemmer("dutch") if use_stemming else None
         self.lemmatizer = WordNetLemmatizer() if use_lemmatization else None
+        logging.info("TextPreprocessor initialized successfully")
 
     def preprocess_text(self, text: str,
                         full_preprocessing: bool = False) -> str:
@@ -59,17 +67,26 @@ class TextPreprocessor:
         Returns:
             str: The preprocessed text.
         """
-
+        logging.info("\n Preprocessing text: %s", text[:50])
         if not full_preprocessing:
+            logging.info("Applying mild preprocessing for llms")
             if not isinstance(text, str):
+                logging.warning("Input text is not a string. Setting to empty string.")
                 text = ""
+
             if self.remove_non_ascii:
                 text = re.sub(r'[^\x00-\x7F]+', '', text)
+                logging.info("Removed non-ASCII characters")
+
             if self.lowercase:
                 text = text.lower()
+                logging.info("Converted text to lowercase")
+
+            logging.info("Text preprocessing completed")
             return ' '.join(text.split())
 
         if full_preprocessing:
+            logging.info("Applying full preprocessing for traditional models")
             if not isinstance(text, str):
                 text = ""
 
@@ -94,25 +111,34 @@ class TextPreprocessor:
                     i += 1
 
             text = ' '.join(processed_words)
+            logging.info("Detected negations")
 
             if self.remove_non_ascii:
                 text = re.sub(r'[^\x00-\x7F]+', '', text)
+                logging.info("Removed non-ASCII characters")
+
             if self.lowercase:
                 text = text.lower()
+                logging.debug("Converted text to lowercase")
 
             text = re.sub(r'[^\w\s]', '', text)
+            logging.info("Removed punctuation")
             text = ' '.join(text.split())
 
             if not self.stopwords:
                 self.stopwords = set(stopwords.words('dutch'))
             text = ' '.join(word for word in text.split() if word
                             not in self.stopwords or word in negations)
+            logging.info("Removed Dutch stopwords")
 
             if self.stemmer:
                 text = ' '.join(self.stemmer.stem(word) for word in text.split())   # noqa: E501
+                logging.info("Applied stemming")
             elif self.lemmatizer:
                 text = ' '.join(self.lemmatizer.lemmatize(word) for word in text.split())   # noqa: E501
-
+                logging.info("Applied lemmatization")
+        
+        logging.info("Text preprocessing completed")
         return text
 
     def tokenize(self, text: str) -> dict:
