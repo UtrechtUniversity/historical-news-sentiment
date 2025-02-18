@@ -16,6 +16,9 @@ def setup_logging(
         level (int): Logging level. Defaults to logging.INFO.
     """
 
+    if logging.getLogger().hasHandlers():
+        return  # Prevent adding multiple handlers
+
     # Ensure the logs directory exists
     if not os.path.exists(log_dir):
         os.makedirs(log_dir)
