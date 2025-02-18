@@ -101,41 +101,29 @@ class CSVDataLoader:
 
     def __init__(
         self,
-        preprocessor,
-        csv_files: list[Path],
         test_size: float = 0.2,
-        val_size: float = 0.1,
         random_state: int = 42,
     ):
         """
         Initializes the CSVDataLoader object.
 
         Args:
-            preprocessor (TextPreprocessor): Instance of the text preprocessor.
-            csv_files (list[str]): List of paths to CSV files.
+            csv_files (list[str]): Paths to CSV file.
             test_size (float): Proportion of the data to use for
               testing (default: 0.2).
-            val_size (float): Proportion of the remaining training
               data to use for validation
              (default: 0.1).
             random_state (int): Random seed for reproducibility (default: 42).
         """
-        self.preprocessor = preprocessor
-        self.csv_files = csv_files
         self.test_size = test_size
-        self.val_size = val_size
         self.random_state = random_state
 
-    def load_data(self) -> pd.DataFrame:
+    def load_data(self, data_fp) -> pd.DataFrame:
         """
-        Loads and concatenates data from all specified CSV files.
-
-        Returns:
-            pd.DataFrame: A concatenated DataFrame containing data
-              from all CSV files.
+     
         """
-        dataframes = [pd.read_csv(file) for file in self.csv_files]
-        return pd.concat(dataframes)
+        dataframes = pd.read_csv(data_fp)
+        return dataframes
 
     def split_data(self,
                    data: Union[list, pd.Series],
@@ -150,7 +138,7 @@ class CSVDataLoader:
               of corresponding labels.
 
         Returns:
-            tuple: Training, validation, and test datasets and their
+            tuple: Training, and test datasets and their
               respective labels.
         """
         if isinstance(data, pd.Series):
@@ -162,14 +150,17 @@ class CSVDataLoader:
             data, labels, test_size=self.test_size,
             random_state=self.random_state
         )
-        train_data, val_data, train_labels, val_labels = train_test_split(
-            train_data,
-            train_labels,
-            test_size=self.val_size / (1 - self.test_size),
-            random_state=self.random_state,
-        )
-        return (train_data, val_data, test_data,
-                train_labels, val_labels, test_labels)
+    
+        return (train_data, test_data,
+                train_labels, test_labels)
+
+
+class DataSetCreator:
+    """
+    """
+    def __init__(self, train_fp:Path, test_fp:Path):
+        self.train_fp = train_fp
+        self.test_fp = test_fp
 
     def create_datasets(
         self,
@@ -178,6 +169,7 @@ class CSVDataLoader:
         method: str,
         window_size: int,
         stride: int,
+        preprocessor
     ) -> tuple[TextDataset, TextDataset, TextDataset]:
         """
         Creates PyTorch datasets for training, validation, and testing.
@@ -189,30 +181,37 @@ class CSVDataLoader:
               ('sliding_window' or 'chunking').
             window_size (int): Maximum segment length in tokens.
             stride (int): Step size between windows (only for sliding window).
+            preprocessor (TextPreprocessor): Instance of the text preprocessor. 
 
         Returns:
             tuple[TextDataset, TextDataset, TextDataset]:
               Training, validation, and test datasets.
         """
-        data = self.load_data()
-        labels = data[label_col].values
-        texts = data[text_col].values
 
-        train_texts, val_texts, test_texts, train_labels, val_labels, test_labels = (   # noqa: E501
-            self.split_data(
-                texts.tolist() if hasattr(texts, 'tolist') else list(texts),
-                labels.tolist() if hasattr(labels, 'tolist') else list(labels)))   # noqa: E501
+        csvdataloader = CSVDataLoader()
+
+        data_train = csvdataloader.load_data(self.train_fp)
+        data_test =csvdataloader.load_data(self.test_fp)
+        train_labels = data_train[label_col].values
+        train_texts = data_train[text_col].values
+        test_labels = data_test[label_col].values
+        test_texts = data_test[text_col].values
+
+        train_texts, val_texts, train_labels, val_labels= (   # noqa: E501
+            csvdataloader.split_data(
+                train_texts.tolist() if hasattr(train_texts, 'tolist') else list(train_texts),
+                train_labels.tolist() if hasattr(train_labels, 'tolist') else list(train_labels)))   # noqa: E501
 
         train_dataset = TextDataset(
-            train_texts, train_labels, self.preprocessor, label_col,
+            train_texts, train_labels, preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
         val_dataset = TextDataset(
-            val_texts, val_labels, self.preprocessor, label_col,
+            val_texts, val_labels, preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
         test_dataset = TextDataset(
-            test_texts, test_labels, self.preprocessor, label_col,
+            test_texts, test_labels, preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
 
