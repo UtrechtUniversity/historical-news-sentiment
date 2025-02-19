@@ -1,11 +1,11 @@
 """Script for loading text data from CSV files, preprocessing it,
 and creating PyTorch datasets for machine learning models."""
 from pathlib import Path
+from typing import Tuple
 import torch
 from torch.utils.data import Dataset
 import pandas as pd
 from sklearn.model_selection import train_test_split  # type: ignore
-from typing import Tuple
 
 
 class TextDataset(Dataset):
@@ -118,20 +118,27 @@ class CSVDataLoader:
 
     def load_data(self, data_fp) -> pd.DataFrame:
         """
-     
+        Load data from a CSV file into a pandas DataFrame.
+
+        Args:
+            data_fp (str): The file path to the CSV file.
+
+        Returns:
+            pd.DataFrame: The loaded data as a pandas DataFrame.
         """
         dataframes = pd.read_csv(data_fp)
         return dataframes
 
     def split_data(self,
-               data: pd.DataFrame,
-               labels: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame]:
+                   data: pd.DataFrame,
+                   labels: pd.Series) -> Tuple[pd.DataFrame, pd.DataFrame]:
         """
         Splits the data into training and test sets and returns them as DataFrames.
 
         Args:
             data (pd.DataFrame): pandas DataFrame containing the text data.
-            labels (Union[pd.Series, pd.DataFrame]): pandas Series or DataFrame of corresponding labels.
+            labels (Union[pd.Series, pd.DataFrame]): pandas Series or DataFrame of
+            corresponding labels.
 
         Returns:
             tuple: Training and test dataframes and their respective labels as DataFrames.
@@ -140,7 +147,6 @@ class CSVDataLoader:
         train_data, test_data, train_labels, test_labels = train_test_split(
             data, labels, test_size=self.test_size, random_state=self.random_state
         )
-        
         # Convert the data and labels into DataFrames
         train_df = pd.DataFrame(train_data)
         train_df['label'] = train_labels
@@ -149,10 +155,12 @@ class CSVDataLoader:
 
         return train_df, test_df
 
+
 class DataSetCreator:
     """
+    Handles the creation of training, validation, and test datasets from CSV files.
     """
-    def __init__(self, train_fp:Path, test_fp:Path):
+    def __init__(self, train_fp: Path, test_fp: Path):
         self.train_fp = train_fp
         self.test_fp = test_fp
 
@@ -175,37 +183,43 @@ class DataSetCreator:
               ('sliding_window' or 'chunking').
             window_size (int): Maximum segment length in tokens.
             stride (int): Step size between windows (only for sliding window).
-            preprocessor (TextPreprocessor): Instance of the text preprocessor. 
+            preprocessor (TextPreprocessor): Instance of the text preprocessor.
 
         Returns:
             tuple[TextDataset, TextDataset, TextDataset]:
               Training, validation, and test datasets.
         """
 
-        csvdataloader = CSVDataLoader()
+        csv_dataloader = CSVDataLoader()
 
-        data_train = csvdataloader.load_data(self.train_fp)
-        data_test =csvdataloader.load_data(self.test_fp)
+        data_train = csv_dataloader.load_data(self.train_fp)
+        data_test = csv_dataloader.load_data(self.test_fp)
         train_labels = data_train[label_col].values
         train_texts = data_train[text_col].values
         test_labels = data_test[label_col].values
         test_texts = data_test[text_col].values
 
-        train_texts, val_texts, train_labels, val_labels= (   # noqa: E501
-            csvdataloader.split_data(
-                train_texts.tolist() if hasattr(train_texts, 'tolist') else list(train_texts),
-                train_labels.tolist() if hasattr(train_labels, 'tolist') else list(train_labels)))   # noqa: E501
+        train_df, val_df = (  # noqa: E501
+            csv_dataloader.split_data(
+                data_train,
+                train_labels if isinstance(train_labels, pd.Series)
+                else pd.Series(train_labels)
+            ))  # noqa: E501
 
         train_dataset = TextDataset(
-            train_texts, train_labels, preprocessor, label_col,
+            train_df[text_col].to_list(),
+            train_df[label_col].to_list(), preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
         val_dataset = TextDataset(
-            val_texts, val_labels, preprocessor, label_col,
+            val_df[text_col].to_list(),
+            val_df[label_col].to_list(), preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
+
         test_dataset = TextDataset(
-            test_texts, test_labels, preprocessor, label_col,
+            test_texts.astype(str).tolist(),
+            test_labels.astype(str).tolist(), preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
 
