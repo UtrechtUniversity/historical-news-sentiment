@@ -9,6 +9,7 @@ import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union, Any
 from lime.lime_text import LimeTextExplainer  # type: ignore
 import spacy
+import spacy.cli
 import json
 import logging
 from interest.utils.logging_utils import setup_logging
@@ -35,7 +36,7 @@ class Classifier:
             self.nlp = spacy.load('nl_core_news_sm')
         except OSError:
             logger.info("Model not found. Downloading...")
-            spacy.cli.download('nl_core_news_sm')  # type: ignor
+            spacy.cli.download('nl_core_news_sm')
             self.nlp = spacy.load('nl_core_news_sm')
 
     def train_classifiers(
@@ -59,8 +60,10 @@ class Classifier:
             with open('hyperparameter_results.json', 'r') as f:
                 best_params = json.load(f)
         except FileNotFoundError:
-            logger.info("Best parameters file not found. Ensure hyperparameter "
-                  "optimization is completed.")
+            logger.info(
+                "Best parameters file not found. Ensure hyperparameter "
+                "optimization is completed."
+                )
 
             return {}
 
@@ -152,7 +155,9 @@ class Classifier:
             print(f"AUC-ROC: {auc_roc:.4f}")
             print('\n', '******************************************', '\n')
         except Exception as e:
-            logger.info(f"Error occurred while printing evaluation metrics: {e}")
+            logger.info(
+                f"Error occurred while printing evaluation metrics: {e}"
+            )
 
     def plot_roc_curves(self, fpr_all: List[float], tpr_all: List[float], classifiers: Dict[str, object]) -> None:  # noqa: E501
         """
