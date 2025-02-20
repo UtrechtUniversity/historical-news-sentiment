@@ -1,7 +1,6 @@
 import argparse
 import yaml
 import logging
-import pandas as pd
 from pathlib import Path
 from typing import Optional, Dict
 from interest.dataprocessor.preprocessor import TextPreprocessor
@@ -15,6 +14,7 @@ logging.info("Logging initialized")
 
 CONFIG_PATH = Path("../config/config.yaml")
 
+
 def load_config(config_path: Path) -> Dict:
     """Load configuration from a YAML file."""
     if not config_path.exists():
@@ -23,7 +23,8 @@ def load_config(config_path: Path) -> Dict:
 
     with config_path.open("r") as f:
         return yaml.safe_load(f)
-    
+
+
 def get_preprocessor(config: Dict) -> TextPreprocessor:
     """Initialize and return a text preprocessor instance."""
     return TextPreprocessor(
@@ -34,12 +35,13 @@ def get_preprocessor(config: Dict) -> TextPreprocessor:
         use_lemmatization=config["preprocessing"]["use_lemmatization"]
     )
 
+
 def prepare_data(
     input_fp: Path,
     output_dir: Path,
-    config: Dict, 
-    text_col: Optional[str] = None, 
-    label_col: Optional[str] = None, 
+    config: Dict,
+    text_col: Optional[str] = None,
+    label_col: Optional[str] = None,
     binary_labels: bool = False
 ) -> None:
     """
@@ -48,15 +50,20 @@ def prepare_data(
     Args:
         data_dir (Path): Directory containing CSV files.
         config (Dict): Configuration dictionary.
-        text_col (Optional[str]): Column name for text data (default: from config).
-        label_col (Optional[str]): Column name for labels (default: from config).
-        binary_labels (bool): Convert labels to binary format (default: True).
+        text_col (Optional[str]):
+          Column name for text data (default: from config).
+        label_col (Optional[str]):
+          Column name for labels (default: from config).
+        binary_labels (bool):
+          Convert labels to binary format (default: True).
 
     Returns:
-        Tuple[pd.Series, pd.Series]: Processed text data and corresponding labels.
+        Tuple[pd.Series, pd.Series]:
+          Processed text data and corresponding labels.
 
     Raises:
-        FileNotFoundError: If no CSV files are found in the given directory.
+        FileNotFoundError:
+          If no CSV files are found in the given directory.
     """
     if text_col is None:
         text_col = config["data"]["text_column"]
@@ -74,33 +81,50 @@ def prepare_data(
 
     preprocessor = get_preprocessor(config)
     dataset["processed_text"] = dataset[text_col].apply(
-        lambda x: preprocessor.preprocess_text(x, full_preprocessing=True)
+        lambda x: preprocessor.preprocess_text(
+            x, full_preprocessing=True
+        )
     )
-    logging.info(f"Data preprocessing completed. Processed {len(dataset)} rows.")
+    logging.info(
+        f"Data preprocessing completed. Processed {len(dataset)} rows."
+    )
 
-    train_dataset, test_dataset = loader.split_data(data=dataset.drop(columns=[label_col]), labels=dataset[label_col])
+    train_dataset, test_dataset = loader.split_data(
+        data=dataset.drop(columns=[label_col]), labels=dataset[label_col]
+    )
     os.makedirs(output_dir, exist_ok=True)
-    train_dataset.to_csv(os.path.join(output_dir, 'train_dataset.csv'), index=False)
-    test_dataset.to_csv(os.path.join(output_dir, 'test_dataset.csv'), index=False)
-    logging.info(f"Data spliting completed. Shape of trainset: {train_dataset.shape} and the shape of testset is: {test_dataset.shape}")
+    train_dataset.to_csv(os.path.join(
+        output_dir, 'train_dataset.csv'), index=False
+    )
+    test_dataset.to_csv(
+        os.path.join(output_dir, 'test_dataset.csv'), index=False
+    )
+    logging.info(
+        f"Data spliting completed. "
+        f"Shape of trainset: {train_dataset.shape} "
+        f"and the shape of testset is: {test_dataset.shape}"
+    )
 
-    
+
 def parse_arguments() -> tuple[Path, Path]:
-    parser = argparse.ArgumentParser(description="Load and preprocess text data.")
+    parser = argparse.ArgumentParser(
+        description="Load and preprocess text data."
+    )
     parser.add_argument(
-        "--data_fp",  
-        type=str, 
-        default="data/", 
+        "--data_fp",
+        type=str,
+        default="data/",
         help="Path to the input data file path."
     )
     parser.add_argument(
-        "--output_dir",  
-        type=str, 
-        default="output/", 
+        "--output_dir",
+        type=str,
+        default="output/",
         help="Path to the output directory."
     )
     args = parser.parse_args()
     return Path(args.data_fp), Path(args.output_dir)
+
 
 if __name__ == "__main__":
     data_fp, output_dir = parse_arguments()
