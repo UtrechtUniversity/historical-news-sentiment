@@ -137,7 +137,7 @@ class TextPreprocessor:
             elif self.lemmatizer:
                 text = ' '.join(self.lemmatizer.lemmatize(word) for word in text.split())   # noqa: E501
                 logging.info("Applied lemmatization")
-        
+
         logging.info("Text preprocessing completed")
         return text
 
