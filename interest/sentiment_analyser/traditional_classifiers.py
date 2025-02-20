@@ -1,5 +1,5 @@
-from sklearn.feature_extraction.text import TfidfVectorizer  # type: ignore
-from sklearn.linear_model import LogisticRegression  # type: ignore
+from sklearn.feature_extraction.text import TfidfVectorizer
+from sklearn.linear_model import LogisticRegression
 from sklearn.ensemble import RandomForestClassifier, GradientBoostingClassifier  # type: ignore  # noqa:E501
 from sklearn.svm import SVC  # type: ignore
 from sklearn.naive_bayes import ComplementNB  # type: ignore
