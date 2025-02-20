@@ -9,7 +9,7 @@ import logging
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA  # type: ignore
-from sklearn.metrics import (
+from sklearn.metrics import (  # type: ignore
     accuracy_score,
     precision_score,
     recall_score,
