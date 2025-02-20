@@ -63,7 +63,7 @@ class Classifier:
             logger.info(
                 "Best parameters file not found. Ensure hyperparameter "
                 "optimization is completed."
-                )
+            )
 
             return {}
 
