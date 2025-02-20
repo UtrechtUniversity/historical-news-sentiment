@@ -5,7 +5,7 @@ import numpy as np
 import gensim  # type: ignore
 import nltk  # type: ignore
 from nltk.tokenize import sent_tokenize  # type: ignore
-import logging
+import logging  # type: ignore
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA  # type: ignore
