@@ -8,8 +8,8 @@ from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
 from typing import Tuple, Dict, List, Union, Any
 from lime.lime_text import LimeTextExplainer  # type: ignore
-import spacy
-import spacy.cli
+import spacy  # type: ignore
+import spacy.cli  # type: ignore
 import json
 import logging
 from interest.utils.logging_utils import setup_logging
