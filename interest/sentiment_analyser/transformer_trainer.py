@@ -8,7 +8,8 @@ from typing import List
 from sklearn import metrics
 import numpy as np
 import torch
-from transformers import AutoModelForSequenceClassification
+from transformers import (AutoModelForSequenceClassification,
+                          AutoModelForMaskedLM)
 
 
 class TransformerTrainer:
@@ -16,7 +17,8 @@ class TransformerTrainer:
         A class for training and evaluating transformer-based models for sequence classification
         tasks.
     """
-    def __init__(self, model_name, num_labels, output_dir, freeze):
+    def __init__(self, model_name, num_labels, output_dir, freeze,
+                 mlm_model_path=""):
         """
         Initializes the TransformerTrainer instance, loads the model, and freezes layers
         if specified.
@@ -31,11 +33,21 @@ class TransformerTrainer:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
-        self.model = AutoModelForSequenceClassification.from_pretrained(
-            model_name,
-            num_labels=num_labels,
-            ignore_mismatched_sizes=True
-        )
+        if mlm_model_path == "":
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                model_name,
+                num_labels=num_labels,
+                ignore_mismatched_sizes=True
+            )
+        else:
+            mlm_model = AutoModelForMaskedLM.from_pretrained(model_name)
+            mlm_model.load_state_dict(torch.load(mlm_model_path, map_location="cpu"), strict=False)
+            self.model = AutoModelForSequenceClassification.from_pretrained(
+                model_name,
+                num_labels=num_labels,
+                ignore_mismatched_sizes=True
+            )
+            self.model.bert.load_state_dict(mlm_model.bert.state_dict(), strict=False)
 
         if freeze:
             for param in self.model.bert.embeddings.parameters():

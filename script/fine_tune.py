@@ -31,7 +31,7 @@ from interest.sentiment_analyser.transformer_trainer import TransformerTrainer
 
 def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
                       val_dataset: torch.utils.data.Dataset, model_name: str,
-                      output_dir: str, num_labels: int) -> None:
+                      output_dir: str, num_labels: int, model_path: str) -> None:
     """
     Train a transformer model with Ray Tune optimization, logging the training
     and validation losses.
@@ -44,6 +44,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         model_name (str): The model name (e.g., from Huggingface) for the transformer model.
         output_dir (str): The directory where model checkpoints and loss data will be saved.
         num_labels (int): The number of labels in the classification task.
+        model_path (str): The path of the mlm model.
 
     Returns:
         None
@@ -59,7 +60,8 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         model_name=model_name,
         num_labels=num_labels,
         output_dir=output_dir,
-        freeze=config["freeze"]
+        freeze=config["freeze"],
+        mlm_model_path=model_path
     )
 
     train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True)
@@ -255,7 +257,7 @@ def parse_arguments() -> argparse.Namespace:
                         help='model name in huggingface')
     parser.add_argument('--text_field_name', type=str, default='text',
                         help='field name with text')
-    parser.add_argument('--label_field_name', type=str, default='majority_voting',
+    parser.add_argument('--label_field_name', type=str, default='label',
                         help='field name with label')
 
     parser.add_argument('--max_length', type=int, default=512,
@@ -267,6 +269,9 @@ def parse_arguments() -> argparse.Namespace:
     subparsers = main_parser.add_subparsers(dest="mode")
 
     parser_train = subparsers.add_parser("train", parents=[parser])
+    parser_train.add_argument('--model_path', type=str, default="",
+                              help='model path of a checkpoint')
+
     parser_predict = subparsers.add_parser("predict", parents=[parser])
     parser_predict.add_argument('--freeze', type=bool, default=False,
                                 help='freeze first layers while fine-tuning')
@@ -300,7 +305,7 @@ def predict(args: argparse.Namespace) -> None:
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp = args.test_fp)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
     _, _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
@@ -358,7 +363,6 @@ def explain_predict(args: argparse.Namespace) -> None:
         )
         return outputs.logits  # Return the logits directly
 
-
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
     data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
@@ -366,7 +370,7 @@ def explain_predict(args: argparse.Namespace) -> None:
     _, _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride, preprocessor = preprocessor
+        stride=args.stride, preprocessor=preprocessor
     )
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -461,7 +465,7 @@ def train(args: argparse.Namespace) -> None:
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = DataSetCreator(train_fp = args.train_fp, test_fp=args.test_fp)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
     train_dataset, val_dataset, _ = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
@@ -481,7 +485,8 @@ def train(args: argparse.Namespace) -> None:
             val_dataset=val_dataset,
             model_name=args.model_name,
             output_dir=args.output_dir,
-            num_labels=args.num_labels
+            num_labels=args.num_labels,
+            model_path=args.model_path
         ),
         config=search_space,
         resources_per_trial=resources,
