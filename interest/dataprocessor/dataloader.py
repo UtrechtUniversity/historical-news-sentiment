@@ -4,7 +4,7 @@ from pathlib import Path
 from typing import Tuple
 import torch
 from torch.utils.data import Dataset
-import pandas as pd
+import pandas as pd  # type: ignore
 from sklearn.model_selection import train_test_split  # type: ignore
 
 
