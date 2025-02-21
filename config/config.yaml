@@ -1,0 +1,12 @@
+model:
+  name: "emanjavacas/GysBERT-v2"
+  max_length: 128
+
+data:
+  text_column: "text"
+  label_column: "majority_voting"
+
+preprocessing:
+  lowercase: true
+  use_stemming: false
+  use_lemmatization: false

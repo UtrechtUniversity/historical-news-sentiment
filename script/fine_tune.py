@@ -23,15 +23,15 @@ from ray._private.utils import get_ray_temp_dir
 from ray.air import session
 from ray.train import Checkpoint
 
-from config import search_space
-from interest.llm.preprocessor import TextPreprocessor
-from interest.llm.dataloader import CSVDataLoader
-from interest.llm.transformer_trainer import TransformerTrainer
+from config_ray import search_space
+from interest.dataprocessor.preprocessor import TextPreprocessor
+from interest.dataprocessor.dataloader import DataSetCreator
+from interest.sentiment_analyser.transformer_trainer import TransformerTrainer
 
 
 def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
                       val_dataset: torch.utils.data.Dataset, model_name: str,
-                      output_dir: str, num_labels: int) -> None:
+                      output_dir: str, num_labels: int, model_path: str) -> None:
     """
     Train a transformer model with Ray Tune optimization, logging the training
     and validation losses.
@@ -44,6 +44,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         model_name (str): The model name (e.g., from Huggingface) for the transformer model.
         output_dir (str): The directory where model checkpoints and loss data will be saved.
         num_labels (int): The number of labels in the classification task.
+        model_path (str): The path of the mlm model.
 
     Returns:
         None
@@ -59,16 +60,18 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         model_name=model_name,
         num_labels=num_labels,
         output_dir=output_dir,
-        freeze=config["freeze"]
+        freeze=config["freeze"],
+        mlm_model_path=model_path
     )
 
     train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True)
     eval_loader = DataLoader(val_dataset, batch_size=config["batch_size"])
 
-    optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"])
+    optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"],
+                                  weight_decay=config["weight_decay"])
     num_training_steps = config["epochs"] * len(train_loader)
     lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=0,
+        name="linear", optimizer=optimizer, num_warmup_steps=int(num_training_steps * 0.1),
         num_training_steps=num_training_steps
     )
 
@@ -239,8 +242,10 @@ def parse_arguments() -> argparse.Namespace:
         argparse.Namespace: A namespace containing parsed arguments.
     """
     parser = ArgumentParser(add_help=False)
-    parser.add_argument('--data_dir', type=str, required=True,
-                        help='path to csv files')
+    parser.add_argument('--train_fp', type=str, required=True,
+                        help='path to train set')
+    parser.add_argument('--test_fp', type=str, required=True,
+                        help='path to test set')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='path to output')
     parser.add_argument('--model_name', type=str, required=True,
@@ -253,7 +258,7 @@ def parse_arguments() -> argparse.Namespace:
                         help='model name in huggingface')
     parser.add_argument('--text_field_name', type=str, default='text',
                         help='field name with text')
-    parser.add_argument('--label_field_name', type=str, default='final_label',
+    parser.add_argument('--label_field_name', type=str, default='label',
                         help='field name with label')
 
     parser.add_argument('--max_length', type=int, default=512,
@@ -265,6 +270,9 @@ def parse_arguments() -> argparse.Namespace:
     subparsers = main_parser.add_subparsers(dest="mode")
 
     parser_train = subparsers.add_parser("train", parents=[parser])
+    parser_train.add_argument('--model_path', type=str, default="",
+                              help='model path of a checkpoint')
+
     parser_predict = subparsers.add_parser("predict", parents=[parser])
     parser_predict.add_argument('--freeze', type=bool, default=False,
                                 help='freeze first layers while fine-tuning')
@@ -295,16 +303,15 @@ def predict(args: argparse.Namespace) -> None:
     Returns:
         None
     """
-    csv_files = list(Path(args.data_dir).glob('*.csv'))
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
     _, _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride
+        stride=args.stride, preprocessor=preprocessor
     )
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -357,16 +364,14 @@ def explain_predict(args: argparse.Namespace) -> None:
         )
         return outputs.logits  # Return the logits directly
 
-    csv_files = list(Path(args.data_dir).glob('*.csv'))
-
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
     _, _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride
+        stride=args.stride, preprocessor=preprocessor
     )
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
@@ -458,16 +463,15 @@ def train(args: argparse.Namespace) -> None:
     print('session_dir', session_dir)
 
     os.environ["TOKENIZERS_PARALLELISM"] = "false"
-    csv_files = list(Path(args.data_dir).glob('*.csv'))
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = CSVDataLoader(preprocessor, csv_files=csv_files)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
     train_dataset, val_dataset, _ = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
-        stride=args.stride
+        stride=args.stride, preprocessor=preprocessor
     )
 
     cpu_count = os.cpu_count()
@@ -482,7 +486,8 @@ def train(args: argparse.Namespace) -> None:
             val_dataset=val_dataset,
             model_name=args.model_name,
             output_dir=args.output_dir,
-            num_labels=args.num_labels
+            num_labels=args.num_labels,
+            model_path=args.model_path
         ),
         config=search_space,
         resources_per_trial=resources,
