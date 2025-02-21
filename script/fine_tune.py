@@ -67,10 +67,11 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
     train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True)
     eval_loader = DataLoader(val_dataset, batch_size=config["batch_size"])
 
-    optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"])
+    optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"],
+                                  weight_decay=config["weight_decay"])
     num_training_steps = config["epochs"] * len(train_loader)
     lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=0,
+        name="linear", optimizer=optimizer, num_warmup_steps=int(num_training_steps * 0.1),
         num_training_steps=num_training_steps
     )
 
