@@ -7,7 +7,6 @@ from sklearn.svm import SVC  # type: ignore
 from sklearn.linear_model import LogisticRegression  # type: ignore
 from sklearn.naive_bayes import ComplementNB  # type: ignore
 from sklearn.feature_extraction.text import TfidfVectorizer   # type: ignore
-# from interest.utils import prepare_data   # type: ignore
 import json
 import logging
 
@@ -88,13 +87,6 @@ def run_optimization_pipeline(train_data, train_labels, binary_labels):
             "norm": [False, True]
         }
     }
-
-    # train_data, _, _, train_labels, _, _ = prepare_data(data_dir,
-                                                        # binary_labels)
-    # train_data = train_data.tolist()
-    # train_labels = train_labels.tolist()
-
-
 
     vectorizer = TfidfVectorizer()
     X_train = vectorizer.fit_transform(train_data)
