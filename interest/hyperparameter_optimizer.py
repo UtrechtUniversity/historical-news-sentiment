@@ -7,7 +7,7 @@ from sklearn.svm import SVC  # type: ignore
 from sklearn.linear_model import LogisticRegression  # type: ignore
 from sklearn.naive_bayes import ComplementNB  # type: ignore
 from sklearn.feature_extraction.text import TfidfVectorizer   # type: ignore
-from interest.utils import prepare_data   # type: ignore
+# from interest.utils import prepare_data   # type: ignore
 import json
 import logging
 
@@ -55,7 +55,7 @@ def hyperparameter_optimization(classifiers, param_grid, X_train, y_train):
     return results
 
 
-def run_optimization_pipeline(data_dir, binary_labels):
+def run_optimization_pipeline(train_data, train_labels, binary_labels):
     """Execute the hyperparameter optimization pipeline."""
     # Define classifiers and their parameter grids
     classifiers = {
@@ -89,10 +89,12 @@ def run_optimization_pipeline(data_dir, binary_labels):
         }
     }
 
-    train_data, _, _, train_labels, _, _ = prepare_data(data_dir,
-                                                        binary_labels)
+    # train_data, _, _, train_labels, _, _ = prepare_data(data_dir,
+                                                        # binary_labels)
     # train_data = train_data.tolist()
     # train_labels = train_labels.tolist()
+
+
 
     vectorizer = TfidfVectorizer()
     X_train = vectorizer.fit_transform(train_data)
