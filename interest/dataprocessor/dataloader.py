@@ -6,6 +6,8 @@ import torch
 from torch.utils.data import Dataset
 import pandas as pd  # type: ignore
 from sklearn.model_selection import train_test_split  # type: ignore
+from collections import Counter
+import numpy as np
 
 
 class TextDataset(Dataset):
@@ -143,11 +145,9 @@ class CSVDataLoader:
         Returns:
             tuple: Training and test dataframes and their respective labels as DataFrames.
         """
-        # Split the data into train and test sets
         train_data, test_data, train_labels, test_labels = train_test_split(
             data, labels, test_size=self.test_size, random_state=self.random_state
         )
-        # Convert the data and labels into DataFrames
         train_df = pd.DataFrame(train_data)
         train_df['label'] = train_labels
         test_df = pd.DataFrame(test_data)
@@ -163,6 +163,7 @@ class DataSetCreator:
     def __init__(self, train_fp: Path, test_fp: Path):
         self.train_fp = train_fp
         self.test_fp = test_fp
+        self.train_labels = None
 
     def create_datasets(
         self,
@@ -172,7 +173,7 @@ class DataSetCreator:
         window_size: int,
         stride: int,
         preprocessor
-    ) -> tuple[TextDataset, TextDataset, TextDataset]:
+    ) -> tuple[TextDataset, TextDataset]:
         """
         Creates PyTorch datasets for training, validation, and testing.
 
@@ -186,7 +187,7 @@ class DataSetCreator:
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
 
         Returns:
-            tuple[TextDataset, TextDataset, TextDataset]:
+            tuple[TextDataset, TextDataset]:
               Training, validation, and test datasets.
         """
 
@@ -194,33 +195,43 @@ class DataSetCreator:
 
         data_train = csv_dataloader.load_data(self.train_fp)
         data_test = csv_dataloader.load_data(self.test_fp)
-        train_labels = data_train[label_col].values
+        self.train_labels = data_train[label_col].values
         train_texts = data_train[text_col].values
         test_labels = data_test[label_col].values
         test_texts = data_test[text_col].values
 
-        train_df, val_df = (  # noqa: E501
-            csv_dataloader.split_data(
-                data_train,
-                train_labels if isinstance(train_labels, pd.Series)
-                else pd.Series(train_labels)
-            ))  # noqa: E501
-
         train_dataset = TextDataset(
-            train_df[text_col].to_list(),
-            train_df[label_col].to_list(), preprocessor, label_col,
+            train_texts.astype(str).tolist(),
+            self.train_labels.astype(int).tolist(),
+            preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
-        val_dataset = TextDataset(
-            val_df[text_col].to_list(),
-            val_df[label_col].to_list(), preprocessor, label_col,
-            method=method, window_size=window_size, stride=stride
-        )
-
         test_dataset = TextDataset(
             test_texts.astype(str).tolist(),
-            test_labels.astype(str).tolist(), preprocessor, label_col,
+            test_labels.astype(int).tolist(), preprocessor, label_col,
             method=method, window_size=window_size, stride=stride
         )
 
-        return train_dataset, val_dataset, test_dataset
+        return train_dataset, test_dataset
+
+    def calculate_class_weights(self):
+        """
+        Calculate class weights.
+
+        Returns:
+            torch.tensor: Tensor containing the class weights.
+        """
+        class_counts = Counter(self.train_labels)
+        total_samples = len(self.train_labels)
+        num_classes = len(class_counts)
+        class_weights = {}
+
+        for cls, count in class_counts.items():
+            class_weights[cls] = total_samples / (num_classes * count)
+
+        weights_tensor = torch.tensor(
+            [class_weights[cls] for cls in sorted(class_weights)],
+            dtype=torch.float
+        )
+
+        return weights_tensor
