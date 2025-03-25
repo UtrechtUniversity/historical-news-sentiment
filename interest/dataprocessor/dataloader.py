@@ -1,14 +1,13 @@
 """Script for loading text data from CSV files, preprocessing it,
 and creating PyTorch datasets for machine learning models."""
+from collections import Counter
 from pathlib import Path
-from typing import Tuple
+from typing import Tuple, Optional
 import torch
 from torch.utils.data import Dataset
 import pandas as pd  # type: ignore
 from sklearn.model_selection import train_test_split  # type: ignore
-from collections import Counter
 import numpy as np
-
 
 class TextDataset(Dataset):
     """
@@ -163,7 +162,7 @@ class DataSetCreator:
     def __init__(self, train_fp: Path, test_fp: Path):
         self.train_fp = train_fp
         self.test_fp = test_fp
-        self.train_labels = None
+        self.train_labels: Optional[np.ndarray] = None
 
     def create_datasets(
         self,
@@ -192,25 +191,25 @@ class DataSetCreator:
         """
 
         csv_dataloader = CSVDataLoader()
-
-        data_train = csv_dataloader.load_data(self.train_fp)
-        data_test = csv_dataloader.load_data(self.test_fp)
-        self.train_labels = data_train[label_col].values
-        train_texts = data_train[text_col].values
-        test_labels = data_test[label_col].values
-        test_texts = data_test[text_col].values
-
-        train_dataset = TextDataset(
-            train_texts.astype(str).tolist(),
-            self.train_labels.astype(int).tolist(),
-            preprocessor, label_col,
-            method=method, window_size=window_size, stride=stride
-        )
-        test_dataset = TextDataset(
-            test_texts.astype(str).tolist(),
-            test_labels.astype(int).tolist(), preprocessor, label_col,
-            method=method, window_size=window_size, stride=stride
-        )
+        if self.train_fp != "":
+            data_train = csv_dataloader.load_data(self.train_fp)
+            # self.train_labels = data_train[label_col].values
+            self.train_labels = data_train[label_col].to_numpy()
+            train_texts = data_train[text_col].values
+            train_dataset = TextDataset(
+                train_texts.astype(str).tolist(),
+                self.train_labels.astype(int).tolist(),
+                preprocessor, label_col,
+                method=method, window_size=window_size, stride=stride)
+        if self.test_fp != "":
+            data_test = csv_dataloader.load_data(self.test_fp)
+            test_labels = data_test[label_col].values
+            test_texts = data_test[text_col].values
+            test_dataset = TextDataset(
+                test_texts.astype(str).tolist(),
+                test_labels.astype(int).tolist(), preprocessor, label_col,
+                method=method, window_size=window_size, stride=stride
+            )
 
         return train_dataset, test_dataset
 
