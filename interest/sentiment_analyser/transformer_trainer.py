@@ -75,8 +75,6 @@ class TransformerTrainer:
                     param.requires_grad = False
 
         self.model.to(self.device)
-
-        
         class_weights = class_weights.to(self.device)
         self.criterion = nn.CrossEntropyLoss(weight=class_weights)
 
@@ -196,7 +194,6 @@ class TransformerTrainer:
         """
         predictions = np.argmax(probabilities, axis=1)
         accuracy = np.mean(predictions == labels)
-        
         if probabilities.shape[1] == 2:
             auc = metrics.roc_auc_score(labels, probabilities[:, 1])
         else:

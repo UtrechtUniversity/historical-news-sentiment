@@ -165,7 +165,6 @@ class DataSetCreator:
         self.test_fp = test_fp
         self.train_labels: Optional[np.ndarray] = None
 
-
     def create_datasets(
         self,
         label_col: str,
@@ -193,7 +192,6 @@ class DataSetCreator:
         """
 
         csv_dataloader = CSVDataLoader()
-        
         if self.train_fp != "":
             data_train = csv_dataloader.load_data(self.train_fp)
             # self.train_labels = data_train[label_col].values
