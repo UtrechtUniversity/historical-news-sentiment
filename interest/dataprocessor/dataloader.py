@@ -9,6 +9,7 @@ import pandas as pd  # type: ignore
 from sklearn.model_selection import train_test_split  # type: ignore
 import numpy as np
 
+
 class TextDataset(Dataset):
     """
     A PyTorch Dataset for handling text data with preprocessing
@@ -164,6 +165,7 @@ class DataSetCreator:
         self.test_fp = test_fp
         self.train_labels: Optional[np.ndarray] = None
 
+
     def create_datasets(
         self,
         label_col: str,
@@ -187,10 +189,11 @@ class DataSetCreator:
 
         Returns:
             tuple[TextDataset, TextDataset]:
-              Training, validation, and test datasets.
+              Training, and test datasets.
         """
 
         csv_dataloader = CSVDataLoader()
+        
         if self.train_fp != "":
             data_train = csv_dataloader.load_data(self.train_fp)
             # self.train_labels = data_train[label_col].values

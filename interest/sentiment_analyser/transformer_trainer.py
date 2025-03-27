@@ -10,6 +10,7 @@ import numpy as np
 import torch
 from torch import nn
 from transformers import AutoModelForSequenceClassification, AutoConfig  # type: ignore
+
 from transformers import AutoModelForMaskedLM  # type: ignore
 
 
@@ -20,6 +21,7 @@ class TransformerTrainer:
     """
     def __init__(self, model_name, num_labels, output_dir, freeze, class_weights=torch.tensor([]),
                  hidden_dropout=0.3, attention_dropout=0.3, mlm_model_path=""):
+
         """
         Initializes the TransformerTrainer instance,
         loads the model, and freezes layers if specified.
@@ -68,11 +70,13 @@ class TransformerTrainer:
             for param in self.model.base_model.embeddings.parameters():
                 param.requires_grad = False
             for layer in self.model.base_model.encoder.layer[:6]:
+
                 for param in layer.parameters():
                     param.requires_grad = False
 
         self.model.to(self.device)
 
+        
         class_weights = class_weights.to(self.device)
         self.criterion = nn.CrossEntropyLoss(weight=class_weights)
 
@@ -91,7 +95,6 @@ class TransformerTrainer:
         Returns:
             float: The average loss for the epoch.
         """
-
         self.model.train()
         epoch_train_loss = 0.0
         for _, batch in enumerate(train_loader):
@@ -193,6 +196,7 @@ class TransformerTrainer:
         """
         predictions = np.argmax(probabilities, axis=1)
         accuracy = np.mean(predictions == labels)
+        
         if probabilities.shape[1] == 2:
             auc = metrics.roc_auc_score(labels, probabilities[:, 1])
         else:

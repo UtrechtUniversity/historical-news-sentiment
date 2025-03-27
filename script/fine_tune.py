@@ -55,6 +55,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         model_path (str): The path of the mlm model.
         class_weights (torch.FloatTensor): weight of classes
 
+
     Returns:
         None
     """
@@ -66,7 +67,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
 
     kf = KFold(n_splits=K_FOLD, shuffle=True, random_state=RANDOM_STATE)
     print(f"Checkpoint Directory: {checkpoint_dir.resolve()}")
-
+    
     num_epochs = config["epochs"]
     patience = config["patience"]
     hidden_dropout = config["hidden_dropout"]
@@ -324,7 +325,6 @@ def parse_arguments() -> argparse.Namespace:
                               help='model path of a checkpoint')
     parser_train.add_argument('--train_fp', type=str, default="",
                               help='path to train set')
-
     parser_predict = subparsers.add_parser("predict", parents=[parser])
     parser_predict.add_argument('--freeze', type=bool, default=False,
                                 help='freeze first layers while fine-tuning')
