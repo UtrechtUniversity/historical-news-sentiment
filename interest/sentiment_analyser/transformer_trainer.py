@@ -194,7 +194,6 @@ class TransformerTrainer:
         """
         predictions = np.argmax(probabilities, axis=1)
         accuracy = np.mean(predictions == labels)
-        
         if probabilities.shape[1] == 2:
             auc = metrics.roc_auc_score(labels, probabilities[:, 1])
         else:
