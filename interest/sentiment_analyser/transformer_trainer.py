@@ -75,8 +75,6 @@ class TransformerTrainer:
                     param.requires_grad = False
 
         self.model.to(self.device)
-
-        
         class_weights = class_weights.to(self.device)
         self.criterion = nn.CrossEntropyLoss(weight=class_weights)
 
