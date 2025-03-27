@@ -194,10 +194,10 @@ class DataSetCreator:
         csv_dataloader = CSVDataLoader()
         if self.train_fp != "":
             data_train = csv_dataloader.load_data(self.train_fp)
-            if data_train[label_col] is not None:
-                # self.train_labels = data_train[label_col].values
-                self.train_labels = data_train[label_col].to_numpy()
-                train_texts = data_train[text_col].values
+            # self.train_labels = data_train[label_col].values
+            self.train_labels = data_train[label_col].to_numpy()
+            train_texts = data_train[text_col].values
+            if self.train_labels is not None:
                 train_dataset = TextDataset(
                     train_texts.astype(str).tolist(),
                     self.train_labels.astype(int).tolist(),
@@ -208,9 +208,9 @@ class DataSetCreator:
 
         if self.test_fp != "":
             data_test = csv_dataloader.load_data(self.test_fp)
-            if data_test[label_col] is not None:
-                test_labels = data_test[label_col].values
-                test_texts = data_test[text_col].values
+            test_labels = data_test[label_col].values
+            test_texts = data_test[text_col].values
+            if test_labels is not None:
                 test_dataset = TextDataset(
                     test_texts.astype(str).tolist(),
                     test_labels.astype(int).tolist(), preprocessor, label_col,
