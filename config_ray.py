@@ -9,5 +9,8 @@ search_space = {
     "batch_size": tune.choice([16, 32]),
     "lr": tune.loguniform(1e-5, 5e-4),
     "freeze": tune.choice([False]),
-    "weight_decay": tune.choice([0.001])
+    "weight_decay": tune.choice([0.001]),
+    "patience": tune.choice([2]),
+    "hidden_dropout": tune.choice([0.3, 0.4]),
+    "attention_dropout": tune.choice([0.3, 0.4])
 }

@@ -68,6 +68,10 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
     print(f"Checkpoint Directory: {checkpoint_dir.resolve()}")
 
     num_epochs = config["epochs"]
+    patience = config["patience"]
+    hidden_dropout = config["hidden_dropout"]
+    attention_dropout = config["attention_dropout"]
+
     train_losses = np.zeros((K_FOLD, num_epochs))
     val_losses = np.zeros((K_FOLD, num_epochs))
     for fold, (train_idx, val_idx) in enumerate(kf.split(train_dataset)):
@@ -78,14 +82,16 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
             output_dir=output_dir,
             freeze=config["freeze"],
             class_weights=class_weights,
+            hidden_dropout=hidden_dropout,
+            attention_dropout=attention_dropout,
             mlm_model_path=model_path
         )
 
         train_subset = Subset(train_dataset, train_idx)
         val_subset = Subset(train_dataset, val_idx)
 
-        train_loader = DataLoader(train_subset, batch_size=config["batch_size"], shuffle=True)  # train_dataset
-        eval_loader = DataLoader(val_subset, batch_size=config["batch_size"])  # val_dataset
+        train_loader = DataLoader(train_subset, batch_size=config["batch_size"], shuffle=True)
+        eval_loader = DataLoader(val_subset, batch_size=config["batch_size"])
 
         optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"],
                                       weight_decay=config["weight_decay"])
@@ -96,6 +102,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         )
 
         best_val_loss = float("inf")
+        epochs_without_improvement = 0
 
         for epoch in range(config["epochs"]):
 
@@ -103,7 +110,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
             statistics = trainer.evaluate(eval_loader)
 
             train_losses[fold, epoch] = train_loss
-            val_loss = statistics['val_loss']
+            val_loss = round(statistics['val_loss'], 3)
             val_losses[fold, epoch] = val_loss
 
             if val_loss < best_val_loss:
@@ -114,7 +121,7 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
                 print('ray_checkpoint', ray_checkpoint)
 
                 session.report({
-                    "val_loss": statistics['val_loss'],
+                    "val_loss": val_loss,
                     "train_loss": train_loss,
                     "accuracy": statistics.get('accuracy', None),
                     "f1_score": statistics.get('f1_score', None),
@@ -122,6 +129,14 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
                     "recall_macro": statistics.get('recall_macro', None),
                     "epoch": epoch
                 }, checkpoint=ray_checkpoint)
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+                print(f"Early stopping patience count: {epochs_without_improvement}/{patience}")
+
+                if epochs_without_improvement >= patience:
+                    print(f"Stopping early at epoch {epoch + 1} due to no improvement.")
+                    break
 
     avg_train_losses = np.mean(train_losses, axis=0)
     std_train_losses = np.std(train_losses, axis=0)
@@ -171,13 +186,16 @@ def read_json_and_plot(root_dir: str) -> None:
 
 
 def plot_losses_epochs(train_losses: NDArray[np.float64], val_losses: NDArray[np.float64],
-                       std_train_losses: NDArray[np.float64], std_val_losses: NDArray[np.float64], plot_file_path: Path) -> None:
+                       std_train_losses: NDArray[np.float64], std_val_losses: NDArray[np.float64],
+                       plot_file_path: Path) -> None:
     """
     Plot the training and validation losses over epochs and save the plot to the specified file.
 
     Args:
         train_losses (list): A list of training losses across epochs.
         val_losses (list): A list of validation losses across epochs.
+        std_train_losses (list): A list of std of training losses across epochs.
+        std_val_losses (list): A list of std of validation losses across epochs.
         plot_file_path (Path): The file path where the plot will be saved.
 
     Returns:
@@ -188,7 +206,8 @@ def plot_losses_epochs(train_losses: NDArray[np.float64], val_losses: NDArray[np
 
     plt.figure(figsize=(10, 6))
     plt.plot(epochs, train_losses, label="Training Loss")
-    plt.fill_between(epochs, train_losses - std_train_losses, train_losses + std_train_losses, alpha=0.2)
+    plt.fill_between(epochs, train_losses - std_train_losses, train_losses + std_train_losses,
+                     alpha=0.2)
 
     plt.plot(epochs, val_losses, label="Validation Loss")
     plt.fill_between(epochs, val_losses - std_val_losses, val_losses + std_val_losses, alpha=0.2)
@@ -275,9 +294,7 @@ def parse_arguments() -> argparse.Namespace:
         argparse.Namespace: A namespace containing parsed arguments.
     """
     parser = ArgumentParser(add_help=False)
-    parser.add_argument('--train_fp', type=str, required=True,
-                        help='path to train set')
-    parser.add_argument('--test_fp', type=str, required=True,
+    parser.add_argument('--test_fp', type=str, default="",
                         help='path to test set')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='path to output')
@@ -305,6 +322,8 @@ def parse_arguments() -> argparse.Namespace:
     parser_train = subparsers.add_parser("train", parents=[parser])
     parser_train.add_argument('--model_path', type=str, default="",
                               help='model path of a checkpoint')
+    parser_train.add_argument('--train_fp', type=str, default="",
+                              help='path to train set')
 
     parser_predict = subparsers.add_parser("predict", parents=[parser])
     parser_predict.add_argument('--freeze', type=bool, default=False,
@@ -357,7 +376,7 @@ def predict(args: argparse.Namespace) -> None:
     )
     trainer.load_model(args.model_path)
     trainer.model.eval()
-    probabilities = []
+    probabilities: list[float] = []
     labels = []
 
     # Disable gradient computation
@@ -418,7 +437,7 @@ def explain_predict(args: argparse.Namespace) -> None:
     )
     trainer.load_model(args.model_path)
     trainer.model.eval()
-    probabilities = []
+    probabilities: list[float] = []
     labels = []
     attributions = []
 
@@ -529,7 +548,8 @@ def train(args: argparse.Namespace) -> None:
         config=search_space,
         resources_per_trial=resources,
         metric="val_loss",
-        mode="min"
+        mode="min",
+        raise_on_failed_trial=False
     )
 
     best_trial = analysis.get_best_trial(metric="val_loss", mode="min")
