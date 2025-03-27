@@ -8,7 +8,9 @@ from typing import List
 from sklearn import metrics  # type: ignore
 import numpy as np
 import torch
-from transformers import AutoModelForSequenceClassification  # type: ignore
+from torch import nn
+from transformers import AutoModelForSequenceClassification, AutoConfig  # type: ignore
+
 from transformers import AutoModelForMaskedLM  # type: ignore
 
 
@@ -17,8 +19,9 @@ class TransformerTrainer:
         A class for training and evaluating transformer-based
         models for sequence classification tasks.
     """
-    def __init__(self, model_name, num_labels, output_dir, freeze,
-                 mlm_model_path=""):
+    def __init__(self, model_name, num_labels, output_dir, freeze, class_weights=torch.tensor([]),
+                 hidden_dropout=0.3, attention_dropout=0.3, mlm_model_path=""):
+
         """
         Initializes the TransformerTrainer instance,
         loads the model, and freezes layers if specified.
@@ -33,10 +36,18 @@ class TransformerTrainer:
         self.output_dir = output_dir
         os.makedirs(output_dir, exist_ok=True)
 
+        config = AutoConfig.from_pretrained(
+            model_name,
+            num_labels=num_labels,
+            hidden_dropout_prob=hidden_dropout,  # Dropout for fully connected layers
+            attention_probs_dropout_prob=attention_dropout  # Dropout for attention probabilities
+        )
+
         if mlm_model_path == "":
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 model_name,
-                num_labels=num_labels,
+                # num_labels=num_labels,
+                config=config,
                 ignore_mismatched_sizes=True
             )
         else:
@@ -47,21 +58,27 @@ class TransformerTrainer:
 
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 model_name,
-                num_labels=num_labels,
+                # num_labels=num_labels,
+                config=config,
                 ignore_mismatched_sizes=True
             )
-            self.model.bert.load_state_dict(
-                mlm_model.bert.state_dict(), strict=False
+            self.model.base_model.load_state_dict(
+                mlm_model.base_model.state_dict(), strict=False
             )
 
         if freeze:
-            for param in self.model.bert.embeddings.parameters():
+            for param in self.model.base_model.embeddings.parameters():
                 param.requires_grad = False
-            for layer in self.model.bert.encoder.layer[:6]:
+            for layer in self.model.base_model.encoder.layer[:6]:
+
                 for param in layer.parameters():
                     param.requires_grad = False
 
         self.model.to(self.device)
+
+        
+        class_weights = class_weights.to(self.device)
+        self.criterion = nn.CrossEntropyLoss(weight=class_weights)
 
     def train_epoch(self, train_loader, optimizer, lr_scheduler) -> float:
         """
@@ -89,7 +106,9 @@ class TransformerTrainer:
             }
 
             outputs = self.model(**batch)
-            loss = outputs.loss
+            labels = batch['labels']
+            loss = self.criterion(outputs.logits, labels)
+            #  loss = outputs.loss
             epoch_train_loss += loss.item()
 
             loss.backward()
@@ -177,11 +196,15 @@ class TransformerTrainer:
         """
         predictions = np.argmax(probabilities, axis=1)
         accuracy = np.mean(predictions == labels)
-        auc = metrics.roc_auc_score(
-            labels, probabilities, average='macro', multi_class='ovo'
-        )
+        
+        if probabilities.shape[1] == 2:
+            auc = metrics.roc_auc_score(labels, probabilities[:, 1])
+        else:
+            auc = metrics.roc_auc_score(labels, probabilities,
+                                        average='macro', multi_class='ovo')
+
         precision_macro = metrics.precision_score(
-            labels, predictions, average='macro', ero_division=0
+            labels, predictions, average='macro', zero_division=0
         )
         recall_macro = metrics.recall_score(
             labels, predictions, average='macro'

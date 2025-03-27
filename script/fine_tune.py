@@ -12,10 +12,13 @@ import random
 
 import matplotlib.pyplot as plt
 import numpy as np
+from numpy.typing import NDArray
+from sklearn.model_selection import KFold
 import torch
-from torch.utils.data import DataLoader
+from torch.utils.data import DataLoader, Subset
 from transformers import get_scheduler, AutoTokenizer
 from captum.attr import IntegratedGradients
+
 
 import ray
 from ray import tune
@@ -28,10 +31,15 @@ from interest.dataprocessor.preprocessor import TextPreprocessor
 from interest.dataprocessor.dataloader import DataSetCreator
 from interest.sentiment_analyser.transformer_trainer import TransformerTrainer
 
+RANDOM_STATE = 42
+K_FOLD = 5
+
 
 def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
-                      val_dataset: torch.utils.data.Dataset, model_name: str,
-                      output_dir: str, num_labels: int, model_path: str) -> None:
+                      model_name: str,
+                      output_dir: str, num_labels: int,
+                      model_path: str,
+                      class_weights: torch.FloatTensor) -> None:
     """
     Train a transformer model with Ray Tune optimization, logging the training
     and validation losses.
@@ -40,11 +48,13 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
         config (dict): Configuration dictionary containing hyperparameters such as
         learning rate, batch size, etc.
         train_dataset (torch.utils.data.Dataset): The training dataset.
-        val_dataset (torch.utils.data.Dataset): The validation dataset.
+        # val_dataset (torch.utils.data.Dataset): The validation dataset.
         model_name (str): The model name (e.g., from Huggingface) for the transformer model.
         output_dir (str): The directory where model checkpoints and loss data will be saved.
         num_labels (int): The number of labels in the classification task.
         model_path (str): The path of the mlm model.
+        class_weights (torch.FloatTensor): weight of classes
+
 
     Returns:
         None
@@ -55,59 +65,90 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
     checkpoint_dir = Path(output_dir) / f"checkpoint_{config_str}"
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
 
+    kf = KFold(n_splits=K_FOLD, shuffle=True, random_state=RANDOM_STATE)
     print(f"Checkpoint Directory: {checkpoint_dir.resolve()}")
-    trainer = TransformerTrainer(
-        model_name=model_name,
-        num_labels=num_labels,
-        output_dir=output_dir,
-        freeze=config["freeze"],
-        mlm_model_path=model_path
-    )
+    
+    num_epochs = config["epochs"]
+    patience = config["patience"]
+    hidden_dropout = config["hidden_dropout"]
+    attention_dropout = config["attention_dropout"]
 
-    train_loader = DataLoader(train_dataset, batch_size=config["batch_size"], shuffle=True)
-    eval_loader = DataLoader(val_dataset, batch_size=config["batch_size"])
+    train_losses = np.zeros((K_FOLD, num_epochs))
+    val_losses = np.zeros((K_FOLD, num_epochs))
+    for fold, (train_idx, val_idx) in enumerate(kf.split(train_dataset)):
+        print(f'Fold {fold + 1}/{K_FOLD}')
+        trainer = TransformerTrainer(
+            model_name=model_name,
+            num_labels=num_labels,
+            output_dir=output_dir,
+            freeze=config["freeze"],
+            class_weights=class_weights,
+            hidden_dropout=hidden_dropout,
+            attention_dropout=attention_dropout,
+            mlm_model_path=model_path
+        )
 
-    optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"],
-                                  weight_decay=config["weight_decay"])
-    num_training_steps = config["epochs"] * len(train_loader)
-    lr_scheduler = get_scheduler(
-        name="linear", optimizer=optimizer, num_warmup_steps=int(num_training_steps * 0.1),
-        num_training_steps=num_training_steps
-    )
+        train_subset = Subset(train_dataset, train_idx)
+        val_subset = Subset(train_dataset, val_idx)
 
-    train_losses = []
-    val_losses = []
-    best_val_loss = float("inf")
+        train_loader = DataLoader(train_subset, batch_size=config["batch_size"], shuffle=True)
+        eval_loader = DataLoader(val_subset, batch_size=config["batch_size"])
 
-    for epoch in range(config["epochs"]):
-        # Training step for each epoch
-        train_loss = trainer.train_epoch(train_loader, optimizer, lr_scheduler)
-        statistics = trainer.evaluate(eval_loader)
+        optimizer = torch.optim.AdamW(trainer.model.parameters(), lr=config["lr"],
+                                      weight_decay=config["weight_decay"])
+        num_training_steps = config["epochs"] * len(train_loader)
+        lr_scheduler = get_scheduler(
+            name="linear", optimizer=optimizer, num_warmup_steps=int(num_training_steps * 0.1),
+            num_training_steps=num_training_steps
+        )
 
-        train_losses.append(train_loss)
-        val_losses.append(statistics['val_loss'])
+        best_val_loss = float("inf")
+        epochs_without_improvement = 0
 
-        val_loss = statistics['val_loss']
-        if val_loss < best_val_loss:
-            best_val_loss = val_loss
-            checkpoint_path = checkpoint_dir / "best_checkpoint.pt"
-            torch.save(trainer.model.state_dict(), checkpoint_path)
-            ray_checkpoint = Checkpoint.from_directory(str(checkpoint_dir))
-            print('ray_checkpoint', ray_checkpoint)
+        for epoch in range(config["epochs"]):
 
-            session.report({
-                "val_loss": statistics['val_loss'],
-                "train_loss": train_loss,
-                "accuracy": statistics.get('accuracy', None),
-                "f1_score": statistics.get('f1_score', None),
-                "precision_macro": statistics.get('precision_macro', None),
-                "recall_macro": statistics.get('recall_macro', None),
-                "epoch": epoch
-            }, checkpoint=ray_checkpoint)
+            train_loss = trainer.train_epoch(train_loader, optimizer, lr_scheduler)
+            statistics = trainer.evaluate(eval_loader)
 
+            train_losses[fold, epoch] = train_loss
+            val_loss = round(statistics['val_loss'], 3)
+            val_losses[fold, epoch] = val_loss
+
+            if val_loss < best_val_loss:
+                best_val_loss = val_loss
+                checkpoint_path = checkpoint_dir / "best_checkpoint.pt"
+                torch.save(trainer.model.state_dict(), checkpoint_path)
+                ray_checkpoint = Checkpoint.from_directory(str(checkpoint_dir))
+                print('ray_checkpoint', ray_checkpoint)
+
+                session.report({
+                    "val_loss": val_loss,
+                    "train_loss": train_loss,
+                    "accuracy": statistics.get('accuracy', None),
+                    "f1_score": statistics.get('f1_score', None),
+                    "precision_macro": statistics.get('precision_macro', None),
+                    "recall_macro": statistics.get('recall_macro', None),
+                    "epoch": epoch
+                }, checkpoint=ray_checkpoint)
+                epochs_without_improvement = 0
+            else:
+                epochs_without_improvement += 1
+                print(f"Early stopping patience count: {epochs_without_improvement}/{patience}")
+
+                if epochs_without_improvement >= patience:
+                    print(f"Stopping early at epoch {epoch + 1} due to no improvement.")
+                    break
+
+    avg_train_losses = np.mean(train_losses, axis=0)
+    std_train_losses = np.std(train_losses, axis=0)
+    avg_val_losses = np.mean(val_losses, axis=0)
+    std_val_losses = np.std(val_losses, axis=0)
     loss_history_path = Path(checkpoint_dir) / "loss_history.json"
     with open(loss_history_path, "w", encoding="utf-8") as f:
-        json.dump({"train_losses": train_losses, "val_losses": val_losses}, f)
+        json.dump({"train_losses": avg_train_losses.tolist(),
+                   "std_train_losses": std_train_losses.tolist(),
+                   "val_losses": avg_val_losses.tolist(),
+                   "std_val_losses": std_val_losses.tolist()}, f)
 
 
 def read_json_and_plot(root_dir: str) -> None:
@@ -129,12 +170,15 @@ def read_json_and_plot(root_dir: str) -> None:
                 try:
                     with open(json_file, 'r', encoding="utf-8") as f:
                         data = json.load(f)
-                        train_losses = data.get('train_losses', [])
-                        val_losses = data.get('val_losses', [])
+                        train_losses = np.array(data['train_losses'])
+                        val_losses = np.array(data['val_losses'])
+                        std_train_losses = np.array(data['std_train_losses'])
+                        std_val_losses = np.array(data['std_val_losses'])
 
-                        if train_losses and val_losses:
+                        if train_losses.size > 0 and val_losses.size > 0:
                             plot_file_path = json_file.with_suffix('.png')
-                            plot_losses_epochs(train_losses, val_losses, plot_file_path)
+                            plot_losses_epochs(train_losses, val_losses, std_train_losses,
+                                               std_val_losses, plot_file_path)
                             print(f"Saved loss plot for {json_file} at {plot_file_path}")
                         else:
                             print(f"No valid loss data in {json_file} at {sub_folder}")
@@ -142,13 +186,17 @@ def read_json_and_plot(root_dir: str) -> None:
                     print(f"Error reading {json_file}: {e}")
 
 
-def plot_losses_epochs(train_losses: list, val_losses: list, plot_file_path: Path) -> None:
+def plot_losses_epochs(train_losses: NDArray[np.float64], val_losses: NDArray[np.float64],
+                       std_train_losses: NDArray[np.float64], std_val_losses: NDArray[np.float64],
+                       plot_file_path: Path) -> None:
     """
     Plot the training and validation losses over epochs and save the plot to the specified file.
 
     Args:
         train_losses (list): A list of training losses across epochs.
         val_losses (list): A list of validation losses across epochs.
+        std_train_losses (list): A list of std of training losses across epochs.
+        std_val_losses (list): A list of std of validation losses across epochs.
         plot_file_path (Path): The file path where the plot will be saved.
 
     Returns:
@@ -159,7 +207,12 @@ def plot_losses_epochs(train_losses: list, val_losses: list, plot_file_path: Pat
 
     plt.figure(figsize=(10, 6))
     plt.plot(epochs, train_losses, label="Training Loss")
+    plt.fill_between(epochs, train_losses - std_train_losses, train_losses + std_train_losses,
+                     alpha=0.2)
+
     plt.plot(epochs, val_losses, label="Validation Loss")
+    plt.fill_between(epochs, val_losses - std_val_losses, val_losses + std_val_losses, alpha=0.2)
+
     plt.xlabel("Epoch")
     plt.ylabel("Loss")
     plt.title("Loss per Epoch ")
@@ -242,9 +295,7 @@ def parse_arguments() -> argparse.Namespace:
         argparse.Namespace: A namespace containing parsed arguments.
     """
     parser = ArgumentParser(add_help=False)
-    parser.add_argument('--train_fp', type=str, required=True,
-                        help='path to train set')
-    parser.add_argument('--test_fp', type=str, required=True,
+    parser.add_argument('--test_fp', type=str, default="",
                         help='path to test set')
     parser.add_argument('--output_dir', type=str, required=True,
                         help='path to output')
@@ -252,7 +303,7 @@ def parse_arguments() -> argparse.Namespace:
                         help='model name in huggingface')
     parser.add_argument('--lowercase', type=bool, default=False,
                         help='lowercase in preprocessing')
-    parser.add_argument('--num_labels', type=int, default=3,
+    parser.add_argument('--num_labels', type=int, required=True,
                         help='number of classes')
     parser.add_argument('--chunk_method', type=str, default='sliding_window',
                         help='model name in huggingface')
@@ -272,7 +323,8 @@ def parse_arguments() -> argparse.Namespace:
     parser_train = subparsers.add_parser("train", parents=[parser])
     parser_train.add_argument('--model_path', type=str, default="",
                               help='model path of a checkpoint')
-
+    parser_train.add_argument('--train_fp', type=str, default="",
+                              help='path to train set')
     parser_predict = subparsers.add_parser("predict", parents=[parser])
     parser_predict.add_argument('--freeze', type=bool, default=False,
                                 help='freeze first layers while fine-tuning')
@@ -308,7 +360,8 @@ def predict(args: argparse.Namespace) -> None:
                                     lowercase=args.lowercase)
     data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
-    _, _, test_dataset = data_loader.create_datasets(
+    # _, _, test_dataset = data_loader.create_datasets(
+    _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
         stride=args.stride, preprocessor=preprocessor
@@ -323,7 +376,7 @@ def predict(args: argparse.Namespace) -> None:
     )
     trainer.load_model(args.model_path)
     trainer.model.eval()
-    probabilities = []
+    probabilities: list[float] = []
     labels = []
 
     # Disable gradient computation
@@ -368,7 +421,8 @@ def explain_predict(args: argparse.Namespace) -> None:
                                     lowercase=args.lowercase)
     data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
-    _, _, test_dataset = data_loader.create_datasets(
+    # _, _, test_dataset = data_loader.create_datasets(
+    _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
         stride=args.stride, preprocessor=preprocessor
@@ -383,7 +437,7 @@ def explain_predict(args: argparse.Namespace) -> None:
     )
     trainer.load_model(args.model_path)
     trainer.model.eval()
-    probabilities = []
+    probabilities: list[float] = []
     labels = []
     attributions = []
 
@@ -468,31 +522,34 @@ def train(args: argparse.Namespace) -> None:
                                     lowercase=args.lowercase)
     data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
 
-    train_dataset, val_dataset, _ = data_loader.create_datasets(
+    # train_dataset, val_dataset, _ = data_loader.create_datasets(
+    train_dataset, _ = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
         stride=args.stride, preprocessor=preprocessor
     )
 
+    class_weights = data_loader.calculate_class_weights()
     cpu_count = os.cpu_count()
     resources = {"cpu": (cpu_count - 1) if cpu_count is not None else 1}
     device = "cuda" if torch.cuda.is_available() else "cpu"
     resources["gpu"] = 1 if device == "cuda" else 0
-
     analysis = tune.run(
         tune.with_parameters(
             train_transformer,
             train_dataset=train_dataset,
-            val_dataset=val_dataset,
+            # val_dataset=val_dataset,
             model_name=args.model_name,
             output_dir=args.output_dir,
             num_labels=args.num_labels,
-            model_path=args.model_path
+            model_path=args.model_path,
+            class_weights=class_weights
         ),
         config=search_space,
         resources_per_trial=resources,
         metric="val_loss",
-        mode="min"
+        mode="min",
+        raise_on_failed_trial=False
     )
 
     best_trial = analysis.get_best_trial(metric="val_loss", mode="min")
