@@ -194,24 +194,30 @@ class DataSetCreator:
         csv_dataloader = CSVDataLoader()
         if self.train_fp != "":
             data_train = csv_dataloader.load_data(self.train_fp)
-            # self.train_labels = data_train[label_col].values
-            self.train_labels = data_train[label_col].to_numpy()
-            train_texts = data_train[text_col].values
-            train_dataset = TextDataset(
-                train_texts.astype(str).tolist(),
-                self.train_labels.astype(int).tolist(),
-                preprocessor, label_col,
-                method=method, window_size=window_size, stride=stride)
+            if data_train[label_col] is not None:
+                # self.train_labels = data_train[label_col].values
+                self.train_labels = data_train[label_col].to_numpy()
+                train_texts = data_train[text_col].values
+                train_dataset = TextDataset(
+                    train_texts.astype(str).tolist(),
+                    self.train_labels.astype(int).tolist(),
+                    preprocessor, label_col,
+                    method=method, window_size=window_size, stride=stride)
+            else:
+                raise ValueError(f"Column '{label_col}' in training data is None!")
+
         if self.test_fp != "":
             data_test = csv_dataloader.load_data(self.test_fp)
-            test_labels = data_test[label_col].values
-            test_texts = data_test[text_col].values
-            test_dataset = TextDataset(
-                test_texts.astype(str).tolist(),
-                test_labels.astype(int).tolist(), preprocessor, label_col,
-                method=method, window_size=window_size, stride=stride
-            )
-
+            if data_test[label_col] is not None:
+                test_labels = data_test[label_col].values
+                test_texts = data_test[text_col].values
+                test_dataset = TextDataset(
+                    test_texts.astype(str).tolist(),
+                    test_labels.astype(int).tolist(), preprocessor, label_col,
+                    method=method, window_size=window_size, stride=stride
+                )
+            else:
+                raise ValueError(f"Column '{label_col}' in test data is None!")
         return train_dataset, test_dataset
 
     def calculate_class_weights(self):
