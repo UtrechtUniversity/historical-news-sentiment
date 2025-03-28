@@ -173,7 +173,7 @@ class DataSetCreator:
         window_size: int,
         stride: int,
         preprocessor
-    ) -> tuple[TextDataset, TextDataset]:
+    ) -> tuple[Optional[TextDataset], Optional[TextDataset]]:
         """
         Creates PyTorch datasets for training, validation, and testing.
 
@@ -187,9 +187,11 @@ class DataSetCreator:
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
 
         Returns:
-            tuple[TextDataset, TextDataset]:
+            tuple[Optional[TextDataset], Optional[TextDataset]]:
               Training, and test datasets.
         """
+        train_dataset = None
+        test_dataset = None
 
         csv_dataloader = CSVDataLoader()
         if self.train_fp != "":
