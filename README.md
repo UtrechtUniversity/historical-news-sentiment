@@ -14,7 +14,7 @@ Clone this repository to your working station to obtain examples and python scri
 ## Prerequisites
 
 ```
-- Python [>=3.8, <3.11]
+- Python [>=3.11]
 - jupyterlab (or any other program to run jupyter notebooks)
 ```
 To install jupyterlab:

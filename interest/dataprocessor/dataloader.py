@@ -165,7 +165,6 @@ class DataSetCreator:
         self.test_fp = test_fp
         self.train_labels: Optional[np.ndarray] = None
 
-
     def create_datasets(
         self,
         label_col: str,
@@ -174,7 +173,7 @@ class DataSetCreator:
         window_size: int,
         stride: int,
         preprocessor
-    ) -> tuple[TextDataset, TextDataset]:
+    ) -> tuple[Optional[TextDataset], Optional[TextDataset]]:
         """
         Creates PyTorch datasets for training, validation, and testing.
 
@@ -188,32 +187,39 @@ class DataSetCreator:
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
 
         Returns:
-            tuple[TextDataset, TextDataset]:
+            tuple[Optional[TextDataset], Optional[TextDataset]]:
               Training, and test datasets.
         """
+        train_dataset = None
+        test_dataset = None
 
         csv_dataloader = CSVDataLoader()
-        
-        if self.train_fp != "":
+        if self.train_fp != Path(""):
             data_train = csv_dataloader.load_data(self.train_fp)
             # self.train_labels = data_train[label_col].values
             self.train_labels = data_train[label_col].to_numpy()
             train_texts = data_train[text_col].values
-            train_dataset = TextDataset(
-                train_texts.astype(str).tolist(),
-                self.train_labels.astype(int).tolist(),
-                preprocessor, label_col,
-                method=method, window_size=window_size, stride=stride)
-        if self.test_fp != "":
+            if self.train_labels is not None:
+                train_dataset = TextDataset(
+                    train_texts.astype(str).tolist(),
+                    self.train_labels.astype(int).tolist(),
+                    preprocessor, label_col,
+                    method=method, window_size=window_size, stride=stride)
+            else:
+                raise ValueError(f"Column '{label_col}' in training data is None!")
+
+        if self.test_fp != Path(""):
             data_test = csv_dataloader.load_data(self.test_fp)
             test_labels = data_test[label_col].values
             test_texts = data_test[text_col].values
-            test_dataset = TextDataset(
-                test_texts.astype(str).tolist(),
-                test_labels.astype(int).tolist(), preprocessor, label_col,
-                method=method, window_size=window_size, stride=stride
-            )
-
+            if test_labels is not None:
+                test_dataset = TextDataset(
+                    test_texts.astype(str).tolist(),
+                    test_labels.astype(int).tolist(), preprocessor, label_col,
+                    method=method, window_size=window_size, stride=stride
+                )
+            else:
+                raise ValueError(f"Column '{label_col}' in test data is None!")
         return train_dataset, test_dataset
 
     def calculate_class_weights(self):
