@@ -67,7 +67,6 @@ def train_transformer(config: dict, train_dataset: torch.utils.data.Dataset,
 
     kf = KFold(n_splits=K_FOLD, shuffle=True, random_state=RANDOM_STATE)
     print(f"Checkpoint Directory: {checkpoint_dir.resolve()}")
-    
     num_epochs = config["epochs"]
     patience = config["patience"]
     hidden_dropout = config["hidden_dropout"]
@@ -358,7 +357,7 @@ def predict(args: argparse.Namespace) -> None:
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
+    data_loader = DataSetCreator(train_fp=Path(""), test_fp=args.test_fp)
 
     # _, _, test_dataset = data_loader.create_datasets(
     _, test_dataset = data_loader.create_datasets(
@@ -366,6 +365,10 @@ def predict(args: argparse.Namespace) -> None:
         window_size=args.max_length,
         stride=args.stride, preprocessor=preprocessor
     )
+    if test_dataset is None:
+        print("No test dataset found. Skipping prediction.")
+        return
+
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     trainer = TransformerTrainer(
@@ -396,7 +399,9 @@ def predict(args: argparse.Namespace) -> None:
 
     statistics = trainer.make_stats(labels, probabilities)
     print(statistics)
-    save_statistics(statistics, args.output_dir, filename="prediction_statistics.json")
+    save_statistics(statistics, args.output_dir,
+                    filename="prediction_statistics_" + Path(args.model_path).parent.name + ".json"
+                    )
 
 
 def explain_predict(args: argparse.Namespace) -> None:
@@ -419,14 +424,15 @@ def explain_predict(args: argparse.Namespace) -> None:
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
-
-    # _, _, test_dataset = data_loader.create_datasets(
+    data_loader = DataSetCreator(train_fp=Path(""), test_fp=args.test_fp)
     _, test_dataset = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
         stride=args.stride, preprocessor=preprocessor
     )
+    if test_dataset is None:
+        print("No test dataset found. Skipping prediction.")
+        return
     test_loader = DataLoader(test_dataset, batch_size=args.batch_size, shuffle=False)
 
     trainer = TransformerTrainer(
@@ -520,7 +526,7 @@ def train(args: argparse.Namespace) -> None:
 
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
-    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=args.test_fp)
+    data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=Path(""))
 
     # train_dataset, val_dataset, _ = data_loader.create_datasets(
     train_dataset, _ = data_loader.create_datasets(

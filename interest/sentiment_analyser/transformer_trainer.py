@@ -192,6 +192,7 @@ class TransformerTrainer:
         Returns:
             dict: A dictionary containing computed statistics.
         """
+        probabilities = np.array(probabilities)
         predictions = np.argmax(probabilities, axis=1)
         accuracy = np.mean(predictions == labels)
         if probabilities.shape[1] == 2:

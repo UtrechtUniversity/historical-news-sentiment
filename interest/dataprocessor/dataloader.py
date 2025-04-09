@@ -194,7 +194,7 @@ class DataSetCreator:
         test_dataset = None
 
         csv_dataloader = CSVDataLoader()
-        if self.train_fp != "":
+        if self.train_fp != Path(""):
             data_train = csv_dataloader.load_data(self.train_fp)
             # self.train_labels = data_train[label_col].values
             self.train_labels = data_train[label_col].to_numpy()
@@ -208,7 +208,7 @@ class DataSetCreator:
             else:
                 raise ValueError(f"Column '{label_col}' in training data is None!")
 
-        if self.test_fp != "":
+        if self.test_fp != Path(""):
             data_test = csv_dataloader.load_data(self.test_fp)
             test_labels = data_test[label_col].values
             test_texts = data_test[text_col].values
