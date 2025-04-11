@@ -331,7 +331,6 @@ def parse_arguments() -> argparse.Namespace:
                                 help='batch_size')
     parser_predict.add_argument('--model_path', type=str, required=True,
                                 help='model path of a checkpoint')
-
     parser_exp = subparsers.add_parser("explain", parents=[parser])
     parser_exp.add_argument('--freeze', type=bool, default=False,
                             help='freeze first layers while fine-tuning')
@@ -381,8 +380,6 @@ def predict(args: argparse.Namespace) -> None:
     trainer.model.eval()
     probabilities: list[float] = []
     labels = []
-
-    # Disable gradient computation
     with torch.no_grad():
         for _, batch in enumerate(test_loader):
             batch = {k: v.squeeze(1).to(trainer.device).long() if k in ['input_ids',
@@ -397,7 +394,7 @@ def predict(args: argparse.Namespace) -> None:
             probabilities.extend(prob.cpu().numpy())
             labels.extend(batch['labels'].cpu().numpy())
 
-    statistics = trainer.make_stats(labels, probabilities)
+    statistics = trainer.make_stats(labels, probabilities, args.output_dir)
     print(statistics)
     save_statistics(statistics, args.output_dir,
                     filename="prediction_statistics_" + Path(args.model_path).parent.name + ".json"

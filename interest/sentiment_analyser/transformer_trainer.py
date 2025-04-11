@@ -4,9 +4,11 @@ including training, evaluation, and metric computation.
 """
 
 import os
+from pathlib import Path
 from typing import List
 from sklearn import metrics  # type: ignore
 import numpy as np
+import pandas as pd
 import torch
 from torch import nn
 from transformers import AutoModelForSequenceClassification, AutoConfig  # type: ignore
@@ -175,46 +177,58 @@ class TransformerTrainer:
 
         return statistics
 
-    def make_stats(
-            self,
-            labels,
-            probabilities,
-            avg_loss=0.0) -> dict:
+    def make_stats(self, labels, probabilities,
+                   avg_loss=0.0, output_dir="") -> dict:
         """
         Computes classification statistics (accuracy, AUC,
         precision, recall, F1-score).
-
         Args:
-            labels (np.ndarray): The true labels.
-            probabilities (np.ndarray): The predicted probabilities.
-            avg_loss (float, optional): The average loss during evaluation.
+              labels (np.ndarray): The true labels.
+              probabilities (np.ndarray): The predicted probabilities.
+              avg_loss (float, optional): The average loss during evaluation
+              output_dir (str): dir of output
 
-        Returns:
-            dict: A dictionary containing computed statistics.
+         Returns:
+-            dict: A dictionary containing computed statistics.
         """
         probabilities = np.array(probabilities)
+
+        # if probabilities.shape[1] == 2:
+        #     predictions = (probabilities[:, 0] < threshold).astype(int)
+        # else:
+        #     predictions = np.argmax(probabilities, axis=1)
+
         predictions = np.argmax(probabilities, axis=1)
+        probabilities_df = pd.DataFrame(probabilities,
+                                        columns=[f'class_{i}' for i in
+                                                 range(probabilities.shape[1])])
+
+        df = pd.DataFrame({
+            'true_labels': labels,
+            'predictions': predictions,
+            **probabilities_df.to_dict(orient='list')
+        })
+
+        output_path = Path(output_dir) / 'predictions.csv'
+        df.to_csv(output_path, index=False)
+        print(f"Predictions saved to {output_path}")
+
         accuracy = np.mean(predictions == labels)
+
         if probabilities.shape[1] == 2:
             auc = metrics.roc_auc_score(labels, probabilities[:, 1])
         else:
-            auc = metrics.roc_auc_score(labels, probabilities,
-                                        average='macro', multi_class='ovo')
+            auc = metrics.roc_auc_score(labels, probabilities, average='macro', multi_class='ovo')
 
-        precision_macro = metrics.precision_score(
-            labels, predictions, average='macro', zero_division=0
-        )
-        recall_macro = metrics.recall_score(
-            labels, predictions, average='macro'
-        )
+        precision_macro = metrics.precision_score(labels, predictions,
+                                                  average='macro', zero_division=0)
+        recall_macro = metrics.recall_score(labels, predictions, average='macro')
         f1_macro = metrics.f1_score(labels, predictions, average='macro')
 
-        precision_score = metrics.precision_score(
-            labels, predictions, average=None, zero_division=0
-        )
+        precision_score = metrics.precision_score(labels, predictions,
+                                                  average=None, zero_division=0)
         recall_score = metrics.recall_score(labels, predictions, average=None)
         f1_score = metrics.f1_score(labels, predictions, average=None)
-
         statistics = {
             'val_loss': avg_loss,
             'accuracy': accuracy,
@@ -226,6 +240,7 @@ class TransformerTrainer:
             'recall_score': recall_score,
             'f1_score': f1_score,
         }
+
         return statistics
 
     def load_model(self, model_path) -> None:
