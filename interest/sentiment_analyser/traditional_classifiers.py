@@ -13,6 +13,7 @@ import spacy.cli  # type: ignore
 import json
 import logging
 from interest.utils.logging_utils import setup_logging
+from sklearn.preprocessing import label_binarize
 
 
 setup_logging()
@@ -153,19 +154,40 @@ class Classifier:
         """
         fpr_all: List[float] = []
         tpr_all: List[float] = []
+        classes = sorted(set(label_test))  # Get unique class labels
+        label_test_bin = label_binarize(label_test, classes=classes)  # Binarize the labels for ROC computation
+        
         for clf_name, classifier in trained_classifiers.items():
             print(f"Evaluating {clf_name}...")
             try:
                 label_predicted = classifier.predict(text_test_vectorized)
-                self.print_evaluation_metrics(label_test, label_predicted)
-                fpr, tpr, _ = roc_curve(label_test, label_predicted)
-                fpr_all.append(fpr)
-                tpr_all.append(tpr)
+                if hasattr(classifier, "predict_proba"):  # Check if classifier has `predict_proba` method
+                    label_pred_proba = classifier.predict_proba(text_test_vectorized)
+                else:
+                    # Fallback for classifiers like SVC without `probability=True`
+                    label_pred_proba = classifier.decision_function(text_test_vectorized)
+                
+                # Print the evaluation metrics
+                self.print_evaluation_metrics(label_test, label_predicted, label_pred_proba)
+
+                # Compute ROC curve and AUC for multiclass
+                if len(classes) > 2:
+                    # Multiclass: Plot ROC for each class
+                    for i in range(len(classes)):
+                        fpr, tpr, _ = roc_curve(label_test_bin[:, i], label_pred_proba[:, i])
+                        fpr_all.append(fpr)
+                        tpr_all.append(tpr)
+                else:
+                    # Binary classification: Plot ROC
+                    fpr, tpr, _ = roc_curve(label_test, label_pred_proba[:, 1])
+                    fpr_all.append(fpr)
+                    tpr_all.append(tpr)
             except Exception as e:
                 logger.info(f"Error occurred while evaluating {clf_name}: {e}")
+        
         return fpr_all, tpr_all
 
-    def print_evaluation_metrics(self, label_test: Union[List[str], List[int], List[float]], label_predicted: Union[List[str], List[int], List[float]]) -> None:  # noqa: E501
+    def print_evaluation_metrics(self, label_test: Union[List[str], List[int], List[float]], label_predicted: Union[List[str], List[int], List[float]], label_pred_proba: Union[List[str], List[int], List[float]]) -> None:  # noqa: E501
         """
         Print evaluation metrics such as classification report,
         confusion matrix, and AUC-ROC.
@@ -173,25 +195,30 @@ class Classifier:
         Parameters:
         - label_test (array-like): True labels.
         - label_predicted (array-like): Predicted labels.
+        - label_pred_proba (array-like): Predicted probabilities for AUC-ROC computation.
 
         Returns:
         - None
         """
         try:
             print("Classification Report:")
-            print(classification_report(label_test, label_predicted,
-                                        zero_division=1))
+            print(classification_report(label_test, label_predicted, zero_division=1))
 
             print("\nConfusion Matrix:")
             print(confusion_matrix(label_test, label_predicted))
 
-            auc_roc = roc_auc_score(label_test, label_predicted)
+            # Compute AUC-ROC
+            classes = sorted(set(label_test))
+            label_test_bin = label_binarize(label_test, classes=classes)
+
+            if len(classes) > 2:
+                auc_roc = roc_auc_score(label_test_bin, label_pred_proba, multi_class='ovr', average='macro')
+            else:
+                auc_roc = roc_auc_score(label_test, label_pred_proba[:, 1])  # Binary case
             print(f"AUC-ROC: {auc_roc:.4f}")
             print('\n', '******************************************', '\n')
         except Exception as e:
-            logger.info(
-                f"Error occurred while printing evaluation metrics: {e}"
-            )
+            logger.info(f"Error occurred while printing evaluation metrics: {e}")
 
     def plot_roc_curves(self, fpr_all: List[float], tpr_all: List[float], classifiers: Dict[str, object]) -> None:  # noqa: E501
         """
@@ -208,8 +235,11 @@ class Classifier:
         try:
             plt.figure()
             plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+            
             for i, clf_name in enumerate(classifiers.keys()):
-                plt.plot(fpr_all[i], tpr_all[i], lw=2, label=clf_name)
+                if i < len(fpr_all):  # Ensure we have matching fpr/tpr values for each classifier
+                    plt.plot(fpr_all[i], tpr_all[i], lw=2, label=clf_name)
+            
             plt.xlim([0.0, 1.0])
             plt.ylim([0.0, 1.05])
             plt.xlabel('False Positive Rate')
@@ -219,6 +249,7 @@ class Classifier:
             plt.show()
         except Exception as e:
             logger.info(f"Error occurred while plotting ROC curves: {e}")
+
 
     def train_and_evaluate_classifiers(self, text_train, text_test, label_train, label_test, binary: bool = True) -> None:  # noqa: E501
         """
