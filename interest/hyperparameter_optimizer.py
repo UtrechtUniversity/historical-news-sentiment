@@ -123,10 +123,12 @@ def run_optimization_pipeline(train_data, train_labels, binary_labels):
     
     results = hyperparameter_optimization(classifiers, param_grid, X_train, train_labels, binary_labels)
     results_file = "hyperparameter_results_binary.json" if binary_labels else "hyperparameter_results_multiclass.json"
-    with open(results_file, 'w') as f:
-        json.dump(results, f, indent=4)
-
-    logger.info(f"Hyperparameter optimization results saved to {results_file}")
+    try:
+        with open(results_file, 'w') as f:
+            json.dump(results, f, indent=4)
+        logger.info(f"Hyperparameter optimization results saved to {results_file}")
+    except Exception as e:
+        logger.error(f"Failed to write results to {results_file}: {e}")
 
     for clf_name, res in results.items():
         logger.info(f"{clf_name} Results: {res}")
