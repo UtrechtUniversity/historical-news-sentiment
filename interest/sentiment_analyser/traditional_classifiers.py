@@ -39,59 +39,93 @@ class Classifier:
             spacy.cli.download('nl_core_news_sm')
             self.nlp = spacy.load('nl_core_news_sm')
 
+    def _strip_classifier_prefix(self, params: Union[Dict[str, Any], List[Tuple[str, Any]]], valid_keys: List[str] = None) -> Dict[str, Any]:
+        """
+        Strip the 'classifier__' prefix from parameter keys and optionally filter to valid keys.
+        """
+        if isinstance(params, list):
+            params = dict(params)
+        stripped = {key.split("classifier__")[-1]: val for key, val in params.items()}
+        if valid_keys:
+            stripped = {k: v for k, v in stripped.items() if k in valid_keys}
+        return stripped
+
     def train_classifiers(
         self,
         text_train_vectorized: Union[List[str], List[int], List[float]],
         label_train: Union[List[str], List[int], List[float]],
+        binary_labels: bool = True,
     ) -> Dict[str, object]:
-
         """
         Train multiple classifiers on the training data.
-
-        Parameters:
-        - text_train_vectorized (sparse matrix): Vectorized training text data.
-        - label_train (array-like): Training labels.
-
-        Returns:
-        - Dict: Trained classifiers.
         """
+        results_file = (
+            "hyperparameter_results_binary.json"
+            if binary_labels
+            else "hyperparameter_results_multiclass.json"
+        )
 
         try:
-            with open('hyperparameter_results.json', 'r') as f:
+            with open(results_file, 'r') as f:
                 best_params = json.load(f)
         except FileNotFoundError:
             logger.info(
-                "Best parameters file not found. Ensure hyperparameter "
+                f"Best parameters file '{results_file}' not found. Ensure hyperparameter "
                 "optimization is completed."
             )
-
             return {}
 
         classifiers: Dict[str, Any] = {
             "Gradient Boosting": GradientBoostingClassifier(
-                **best_params.get("Gradient Boosting", {}).get("best_params", {}),  # noqa:E501
+                **self._strip_classifier_prefix(
+                    best_params.get("Gradient Boosting", {}).get("best_params", {}),
+                    valid_keys=[
+                        "n_estimators", "learning_rate", "subsample", "min_samples_split",
+                        "min_samples_leaf", "max_depth", "max_features"
+                    ]
+                ),
                 random_state=42,
             ),
             "Support Vector Machine": SVC(
-                **best_params.get("Support Vector Machine", {}).get("best_params", {}),  # noqa:E501
+                **self._strip_classifier_prefix(
+                    best_params.get("Support Vector Machine", {}).get("best_params", {}),
+                    valid_keys=[
+                        "C", "kernel", "degree", "gamma", "coef0", "shrinking", "probability"
+                    ]
+                ),
                 class_weight="balanced",
-                kernel="rbf",
                 random_state=42,
                 probability=True,
             ),
             "Logistic Regression": LogisticRegression(
-                **best_params.get("Logistic Regression", {}).get("best_params", {}),  # noqa:E501
+                **self._strip_classifier_prefix(
+                    best_params.get("Logistic Regression", {}).get("best_params", {}),
+                    valid_keys=[
+                        "penalty", "C", "solver", "l1_ratio"
+                    ]
+                ),
                 class_weight="balanced",
                 max_iter=1000,
                 random_state=42,
             ),
             "Random Forest": RandomForestClassifier(
-                **best_params.get("Random Forest", {}).get("best_params", {}),
+                **self._strip_classifier_prefix(
+                    best_params.get("Random Forest", {}).get("best_params", {}),
+                    valid_keys=[
+                        "n_estimators", "max_depth", "min_samples_split", "min_samples_leaf",
+                        "max_features", "bootstrap"
+                    ]
+                ),
                 class_weight="balanced",
                 random_state=42,
             ),
             "Naive Bayes": ComplementNB(
-                **best_params.get("Naive Bayes", {}).get("best_params", {})
+                **self._strip_classifier_prefix(
+                    best_params.get("Naive Bayes", {}).get("best_params", {}),
+                    valid_keys=[
+                        "alpha", "norm"
+                    ]
+                )
             ),
         }
 
@@ -104,7 +138,7 @@ class Classifier:
             except Exception as e:
                 logger.info(f"Error occurred while training {clf_name}: {e}")
         return trained_classifiers
-
+    
     def evaluate_classifiers(self, trained_classifiers: Dict[str, Any], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
         """
         Evaluate trained classifiers on the test data.
