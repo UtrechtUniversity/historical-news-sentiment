@@ -48,18 +48,21 @@ class TextDataset(Dataset):
         self.stride = stride
         self.tokenized_data = self.tokenize_texts()
 
-    def tokenize_texts(self) -> list[tuple[dict, int]]:
+    def tokenize_texts(self) -> list[tuple[dict, int, int]]:
         """
         Tokenizes and segments the input texts using the specified method.
 
         Returns:
-            list[tuple[dict, int]]: A list of tokenized text segments and
-            their labels.
+            list[tuple[dict, int, int]]: A list of tuples, each containing:
+            - A dictionary representing the tokenized text segment,
+            - The corresponding label for the segment,
+            - The document ID the segment originated from.
         """
         tokenized_segments = []
         segment_labels = []
+        segment_doc_ids = []
 
-        for text, label in zip(self.texts, self.labels):
+        for doc_index, (text, label) in enumerate(zip(self.texts, self.labels)):
             segments = self.preprocessor.preprocess_and_split(
                 text,
                 method=self.method,
@@ -70,8 +73,9 @@ class TextDataset(Dataset):
                 tokens = self.preprocessor.tokenize(segment)
                 tokenized_segments.append(tokens)
                 segment_labels.append(label)
+                segment_doc_ids.append(doc_index)
 
-        return list(zip(tokenized_segments, segment_labels))
+        return list(zip(tokenized_segments, segment_labels, segment_doc_ids))
 
     def __len__(self) -> int:
         """
@@ -90,8 +94,9 @@ class TextDataset(Dataset):
         Returns:
             dict: A dictionary containing tokenized inputs and the label.
         """
-        tokens, label = self.tokenized_data[idx]
+        tokens, label, doc_id = self.tokenized_data[idx]
         tokens['labels'] = torch.tensor(label, dtype=torch.long)
+        tokens['doc_id'] = torch.tensor(doc_id, dtype=torch.long)
         return tokens
 
 

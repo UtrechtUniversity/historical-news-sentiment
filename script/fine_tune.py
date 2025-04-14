@@ -5,6 +5,7 @@ training loss visualization, and saving statistics.
 """
 import argparse
 from argparse import ArgumentParser
+from collections import defaultdict
 import json
 import os
 from pathlib import Path
@@ -380,8 +381,11 @@ def predict(args: argparse.Namespace) -> None:
     trainer.model.eval()
     probabilities: list[float] = []
     labels = []
+    doc_probs = defaultdict(list)
+    doc_labels = {}
     with torch.no_grad():
         for _, batch in enumerate(test_loader):
+            doc_ids = batch.pop('doc_id')
             batch = {k: v.squeeze(1).to(trainer.device).long() if k in ['input_ids',
                                                                         'attention_mask',
                                                                         'token_type_ids']
@@ -390,11 +394,22 @@ def predict(args: argparse.Namespace) -> None:
             outputs = trainer.model(**batch)
             logits = outputs.logits
 
-            prob = torch.softmax(logits, dim=-1)
-            probabilities.extend(prob.cpu().numpy())
-            labels.extend(batch['labels'].cpu().numpy())
+            probs = torch.softmax(logits, dim=-1).cpu().numpy()
+            labels = batch['labels'].cpu().numpy()
+            # probabilities.extend(prob.cpu().numpy())
+            # labels.extend(batch['labels'].cpu().numpy())
+            for i, doc_id in enumerate(doc_ids):
+                doc_id = int(doc_id)
+                doc_probs[doc_id].append(probs[i])
+                doc_labels[doc_id] = labels[i]
 
-    statistics = trainer.make_stats(labels, probabilities, args.output_dir)
+    labels = []
+    for doc_id in sorted(doc_probs):
+        mean_prob = np.mean(doc_probs[doc_id], axis=0)
+        probabilities.append(mean_prob)
+        labels.append(doc_labels[doc_id])
+
+    statistics = trainer.make_stats(labels, probabilities, output_dir=args.output_dir)
     print(statistics)
     save_statistics(statistics, args.output_dir,
                     filename="prediction_statistics_" + Path(args.model_path).parent.name + ".json"
