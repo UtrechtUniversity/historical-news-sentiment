@@ -15,47 +15,49 @@ logging.basicConfig(level=logging.INFO,
                     format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger(__name__)
 
+
 # Function to check if a classifier supports predict_proba()
 def supports_predict_proba(clf):
     return hasattr(clf, "predict_proba")
 
+
 def hyperparameter_optimization(classifiers, param_grid, X_train, y_train, binary_labels):
     results = {}
-    
+
     for clf_name, clf in classifiers.items():
         scoring = {'f1_weighted': 'f1_weighted' if not binary_labels else 'f1'}
         refit_metric = 'f1_weighted'
-        
+
         if supports_predict_proba(clf):
-            scoring['roc_auc'] = make_scorer(roc_auc_score, response_method='predict') if binary_labels else 'roc_auc_ovr'
-            refit_metric = 'roc_auc' 
-        
+            scoring['roc_auc'] = make_scorer(roc_auc_score, response_method='predict') if binary_labels else 'roc_auc_ovr'   # noqa: E501
+            refit_metric = 'roc_auc'
+
         class_counts = Counter(y_train)
         imbalance_ratio = max(class_counts.values()) / min(class_counts.values())
         logger.info(f"Imbalance ratio for {clf_name}: {imbalance_ratio}")
-        
-        use_smote = (binary_labels and imbalance_ratio > 1.5) or (not binary_labels and any(v < 10 for v in class_counts.values()))
-        
+
+        use_smote = (binary_labels and imbalance_ratio > 1.5) or (not binary_labels and any(v < 10 for v in class_counts.values()))   # noqa: E501
+
         pipeline_steps = [('classifier', clf)]
         if use_smote:
             pipeline_steps.insert(0, ('smote', SMOTE()))
-        
+
         pipeline = Pipeline(pipeline_steps)
 
         logger.info(f"Starting hyperparameter optimization for {clf_name}...")
-        param_combinations = len(list(ParameterSampler(param_grid[clf_name], min(100, len(list(ParameterSampler(param_grid[clf_name], 1)))))))
-        
+        param_combinations = len(list(ParameterSampler(param_grid[clf_name], min(100, len(list(ParameterSampler(param_grid[clf_name], 1)))))))   # noqa: E501
+
         # Use only the relevant scoring metrics for each classifier
-        valid_scoring = {k: v for k, v in scoring.items() if k != 'roc_auc' or supports_predict_proba(clf)}
+        valid_scoring = {k: v for k, v in scoring.items() if k != 'roc_auc' or supports_predict_proba(clf)}   # noqa: E501
         refit_metric = 'roc_auc' if 'roc_auc' in valid_scoring else 'f1_weighted'
-        
+
         grid_search = RandomizedSearchCV(
-            pipeline, 
-            param_distributions=param_grid[clf_name], 
-            n_iter=min(10, param_combinations),  
-            cv=3, 
-            scoring=valid_scoring, 
-            refit=refit_metric, 
+            pipeline,
+            param_distributions=param_grid[clf_name],
+            n_iter=min(10, param_combinations),
+            cv=3,
+            scoring=valid_scoring,
+            refit=refit_metric,
             n_jobs=4
         )
 
@@ -64,11 +66,11 @@ def hyperparameter_optimization(classifiers, param_grid, X_train, y_train, binar
         val_score = grid_search.best_score_
         logger.info(f"Training Score: {train_score}")
         logger.info(f"Cross-validation Score: {val_score}")
-        
+
         if train_score < 0.6 and val_score < 0.6:
-            logger.warning(f"{clf_name} may be underfitting: Training Score: {train_score}, Validation Score: {val_score}")
+            logger.warning(f"{clf_name} may be underfitting: Training Score: {train_score}, Validation Score: {val_score}")   # noqa: E501
         if train_score > 0.6 and train_score > val_score + max(0.1, 0.1 * val_score):
-            logger.warning(f"{clf_name} may be overfitting: Training Score: {train_score}, Validation Score: {val_score}")
+            logger.warning(f"{clf_name} may be overfitting: Training Score: {train_score}, Validation Score: {val_score}")   # noqa: E501
 
         results[clf_name] = {
             'best_params': grid_search.best_params_,
@@ -81,10 +83,11 @@ def hyperparameter_optimization(classifiers, param_grid, X_train, y_train, binar
 
     return results
 
+
 def run_optimization_pipeline(train_data, train_labels, binary_labels):
     classifiers = {
         "Gradient Boosting": HistGradientBoostingClassifier(random_state=42),
-        "Support Vector Machine": SVC(kernel='rbf', decision_function_shape='ovr', random_state=42),
+        "Support Vector Machine": SVC(kernel='rbf', decision_function_shape='ovr', random_state=42),   # noqa: E501
         "Logistic Regression": LogisticRegression(max_iter=1000, random_state=42),
         "Random Forest": RandomForestClassifier(random_state=42),
         "Naive Bayes": ComplementNB()
@@ -93,7 +96,7 @@ def run_optimization_pipeline(train_data, train_labels, binary_labels):
     param_grid = {
         "Gradient Boosting": {
             "classifier__max_iter": [50, 100, 200],
-            "classifier__learning_rate": [0.01, 0.05, 0.1] if not binary_labels else [0.01, 0.1, 0.5]
+            "classifier__learning_rate": [0.01, 0.05, 0.1] if not binary_labels else [0.01, 0.1, 0.5]  # noqa: E501
         },
         "Support Vector Machine": {
             "classifier__C": [0.01, 0.1, 1] if not binary_labels else [0.1, 1, 10],
@@ -116,13 +119,27 @@ def run_optimization_pipeline(train_data, train_labels, binary_labels):
 
     vectorizer = TfidfVectorizer()
     X_train = vectorizer.fit_transform(train_data)
-    
+
     if "Gradient Boosting" in classifiers:
-        logger.info(f"Converting X_train to dense array for Gradient Boosting. Shape: {X_train.shape}")
+        logger.info(
+            "Converting X_train to dense array for Gradient Boosting. "
+            f"Shape: {X_train.shape}"
+        )
+
         X_train = X_train.toarray()
-    
-    results = hyperparameter_optimization(classifiers, param_grid, X_train, train_labels, binary_labels)
-    results_file = "hyperparameter_results_binary.json" if binary_labels else "hyperparameter_results_multiclass.json"
+
+    results = hyperparameter_optimization(
+        classifiers,
+        param_grid,
+        X_train,
+        train_labels,
+        binary_labels
+    )
+    results_file = (
+        "hyperparameter_results_binary.json"
+        if binary_labels else
+        "hyperparameter_results_multiclass.json"
+    )
     try:
         with open(results_file, 'w') as f:
             json.dump(results, f, indent=4)
