@@ -13,7 +13,8 @@ import spacy.cli  # type: ignore
 import json
 import logging
 from interest.utils.logging_utils import setup_logging
-from sklearn.preprocessing import label_binarize
+import os
+import joblib
 
 
 setup_logging()
@@ -55,14 +56,25 @@ class Classifier:
         return stripped
 
     def train_classifiers(
-        self,
-        text_train_vectorized: Union[List[str], List[int], List[float]],
-        label_train: Union[List[str], List[int], List[float]],
-        binary_labels: bool = True,
+            self,
+            text_train_vectorized: Union[List[str], List[int], List[float]],
+            label_train: Union[List[str], List[int], List[float]],
+            binary_labels: bool = True,
+            model_dir: str = "./model",
     ) -> Dict[str, object]:
         """
-        Train multiple classifiers on the training data.
+        Train multiple classifiers on the training data and save them to disk.
+
+        Parameters:
+        - text_train_vectorized: Vectorized training data.
+        - label_train: Training labels.
+        - binary_labels: Whether it's a binary classification task.
+        - model_dir: Path to directory for saving trained models.
+
+        Returns:
+        - Dict[str, object]: Dictionary of trained classifier objects.
         """
+
         results_file = (
             "hyperparameter_results_binary.json"
             if binary_labels
@@ -133,32 +145,53 @@ class Classifier:
             ),
         }
 
+        # Make sure model_dir exists
+        model_dir = os.path.abspath(model_dir)
+        os.makedirs(model_dir, exist_ok=True)
+
         trained_classifiers: Dict[str, Any] = {}
+        label_type = "binary" if binary_labels else "multi"
+
         for clf_name, classifier in classifiers.items():
             print(f"Training {clf_name}...")
             try:
                 classifier.fit(text_train_vectorized, label_train)
                 trained_classifiers[clf_name] = classifier
+
+                # Save the model
+                file_safe_name = clf_name.replace(" ", "_").lower()
+                model_path = os.path.join(model_dir, f"{file_safe_name}_{label_type}_model.joblib")
+                joblib.dump(classifier, model_path)
+                logger.info(f"Saved {clf_name} to {model_path}")
             except Exception as e:
                 logger.info(f"Error occurred while training {clf_name}: {e}")
+
         return trained_classifiers
 
-    def evaluate_classifiers(self, trained_classifiers: Dict[str, Any], text_test_vectorized: Union[List[str], List[int], List[float]], label_test: Union[List[str], List[int], List[float]]) -> Tuple[List[float], List[float]]:  # noqa: E501
+    def evaluate_classifiers(
+        self,
+        trained_classifiers: Dict[str, Any],
+        text_test_vectorized: Union[List[str], List[int], List[float]],
+        label_test: Union[List[str], List[int], List[float]]
+    ) -> Tuple[List[float], List[float]]:
         """
-        Evaluate trained classifiers on the test data.
+        Evaluate trained classifiers on the test data and print evaluation metrics.
+        For binary classification, also compute FPR and TPR for ROC plotting.
 
         Parameters:
-        - trained_classifiers (Dict): Dictionary of trained classifiers.
-        - text_test_vectorized (sparse matrix): Vectorized test text data.
-        - label_test (array-like): Test labels.
+        - trained_classifiers (Dict[str, Any]): Dictionary of trained classifier objects.
+        - text_test_vectorized (Union[List[str], List[int], List[float]]): Vectorized test set.
+        - label_test (Union[List[str], List[int], List[float]]): Ground truth labels for test set.
 
         Returns:
-        - Tuple: Lists of false positive rates and true positive rates.
+        - Tuple[List[float], List[float]]: Lists of false positive rates and true positive rates
+        (only populated for binary classification; empty lists for multi-class).
         """
         fpr_all: List[float] = []
         tpr_all: List[float] = []
         classes = sorted(set(label_test))
-        label_test_bin = label_binarize(label_test, classes=classes)
+        is_multiclass = len(classes) > 2
+
         for clf_name, classifier in trained_classifiers.items():
             print(f"Evaluating {clf_name}...")
             try:
@@ -170,12 +203,7 @@ class Classifier:
 
                 self.print_evaluation_metrics(label_test, label_predicted, label_pred_proba)
 
-                if len(classes) > 2:
-                    for i in range(len(classes)):
-                        fpr, tpr, _ = roc_curve(label_test_bin[:, i], label_pred_proba[:, i])
-                        fpr_all.append(fpr)
-                        tpr_all.append(tpr)
-                else:
+                if not is_multiclass:
                     fpr, tpr, _ = roc_curve(label_test, label_pred_proba[:, 1])
                     fpr_all.append(fpr)
                     tpr_all.append(tpr)
@@ -184,15 +212,19 @@ class Classifier:
 
         return fpr_all, tpr_all
 
-    def print_evaluation_metrics(self, label_test: Union[List[str], List[int], List[float]], label_predicted: Union[List[str], List[int], List[float]], label_pred_proba: Union[List[str], List[int], List[float]]) -> None:  # noqa: E501
+    def print_evaluation_metrics(
+        self,
+        label_test: Union[List[str], List[int], List[float]],
+        label_predicted: Union[List[str], List[int], List[float]],
+        label_pred_proba: Union[List[str], List[int], List[float]]
+    ) -> None:
         """
-        Print evaluation metrics such as classification report,
-        confusion matrix, and AUC-ROC.
+        Print classification report, confusion matrix, and AUC-ROC score.
 
         Parameters:
         - label_test (array-like): True labels.
-        - label_predicted (array-like): Predicted labels.
-        - label_pred_proba (array-like): Predicted probabilities for AUC-ROC computation.
+        - label_predicted (array-like): Predicted class labels.
+        - label_pred_proba (array-like): Predicted probabilities or decision scores.
 
         Returns:
         - None
@@ -204,18 +236,17 @@ class Classifier:
             print("\nConfusion Matrix:")
             print(confusion_matrix(label_test, label_predicted))
 
-            # Compute AUC-ROC
             classes = sorted(set(label_test))
-            label_test_bin = label_binarize(label_test, classes=classes)
-
             if len(classes) > 2:
                 auc_roc = roc_auc_score(
-                    label_test_bin, label_pred_proba,
+                    label_test,
+                    label_pred_proba,
                     multi_class='ovr',
                     average='macro'
                 )
             else:
-                auc_roc = roc_auc_score(label_test, label_pred_proba[:, 1])  # Binary case
+                auc_roc = roc_auc_score(label_test, label_pred_proba[:, 1])
+
             print(f"AUC-ROC: {auc_roc:.4f}")
             print('\n', '***************************************', '\n')
         except Exception as e:
@@ -251,55 +282,99 @@ class Classifier:
         except Exception as e:
             logger.info(f"Error occurred while plotting ROC curves: {e}")
 
-    def train_and_evaluate_classifiers(self, text_train, text_test, label_train, label_test, binary: bool = True) -> None:  # noqa: E501
+    def train_and_evaluate_classifiers(
+        self,
+        text_train,
+        text_test,
+        label_train,
+        label_test,
+        binary: bool = True,
+        model_dir: str = "../models"
+    ) -> None:
         """
-        Train and evaluate classifiers on the provided data.
+        End-to-end training and evaluation of multiple classifiers.
 
         Parameters:
-        - train_data (DataFrame): DataFrame containing text and labels.
-        - multi_label (bool): Whether the dataset has multi-labels.
+        - text_train (List[str]): Raw text data for training.
+        - text_test (List[str]): Raw text data for testing.
+        - label_train (List[int] or List[str]): Training labels.
+        - label_test (List[int] or List[str]): Test labels.
+        - binary (bool): Whether the task is binary classification.
+        - model_dir (str): Directory to save/load models.
 
         Returns:
         - None
         """
         try:
-
-            # text_train, text_test, label_train, label_test = self.split_dataset(text_set, labels, binary)  # noqa: E501
-
-            # print('label_train counts:', label_train.value_counts())
-            # print('label_test counts:', label_test.value_counts())
-
             text_train_vectorized = self.vectorizer.fit_transform(text_train)
             text_test_vectorized = self.vectorizer.transform(text_test)
 
-            trained_classifiers = self.train_classifiers(text_train_vectorized, label_train)  # noqa: E501
+            trained_classifiers = self.train_classifiers(
+                text_train_vectorized,
+                label_train,
+                binary_labels=binary,
+                model_dir=model_dir
+            )
 
-            fpr_all, tpr_all = self.evaluate_classifiers(trained_classifiers, text_test_vectorized, label_test)  # noqa: E501
+            fpr_all, tpr_all = self.evaluate_classifiers(
+                trained_classifiers,
+                text_test_vectorized,
+                label_test
+            )
 
-            self.plot_roc_curves(fpr_all, tpr_all, trained_classifiers)
+            if binary:
+                self.plot_roc_curves(fpr_all, tpr_all, trained_classifiers)
+
         except Exception as e:
             logger.info(f"Error occurred during training and evaluation: {e}")
 
-    def explain_with_lime(self, trained_classifiers: Dict[str, object],
-                          text_sample: str, label_sample: int) -> None:
+    def explain_with_lime(
+        self,
+        text_sample: str,
+        label_sample: int,
+        model_dir: str = "./model",
+        binary: bool = True
+    ) -> None:
         """
-        Use LIME to explain the predictions of each classifier.
+        Use LIME to explain predictions of classifiers loaded from disk.
 
         Parameters:
-        - trained_classifiers (Dict): Dictionary of trained classifiers.
         - text_sample (str): A single text sample to explain.
         - label_sample (int): True label for the sample.
+        - model_dir (str): Directory from which to load saved models.
+        - binary (bool): Whether it's a binary classification task.
 
         Returns:
         - None
         """
+        from IPython.display import display, HTML  # ✅ safe import
 
-        print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")  # noqa:E501
+        print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")
 
         explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])
-        for clf_name, classifier in trained_classifiers.items():
-            print(f"\nExplaining prediction for {clf_name}...\n")
+
+        model_dir = os.path.abspath(model_dir)
+        label_type = "binary" if binary else "multi"
+
+        classifier_names = [
+            "gradient_boosting",
+            "support_vector_machine",
+            "logistic_regression",
+            "random_forest",
+            "naive_bayes"
+        ]
+
+        explain_dir = os.path.abspath("explainability_outputs")
+        os.makedirs(explain_dir, exist_ok=True)
+
+        for file_safe_name in classifier_names:
+            model_path = os.path.join(model_dir, f"{file_safe_name}_{label_type}_model.joblib")
+            clf_name = file_safe_name.replace("_", " ").title()
+
             try:
+                classifier = joblib.load(model_path)
+                print(f"\nExplaining prediction for {clf_name}...\n")
+
                 def predict_proba(texts):
                     vectorized_texts = self.vectorizer.transform(texts)
                     return classifier.predict_proba(vectorized_texts)
@@ -309,7 +384,17 @@ class Classifier:
                     predict_proba,
                     num_features=10
                 )
-                explanation.show_in_notebook()
-                explanation.save_to_file(f"{clf_name}_lime_explanation.html")
+
+                custom_html = f"""
+                <div style="background-color: white; color: black; padding: 10px;">
+                    {explanation.as_html()}
+                </div>
+                """
+                display(HTML(custom_html))
+
+                output_path = os.path.join(explain_dir, f"{file_safe_name}_lime_explanation.html")
+                explanation.save_to_file(output_path)
+                logger.info(f"LIME explanation for {clf_name} saved to {output_path}")
+
             except Exception as e:
-                logger.info(f"Error occurred while explaining with LIME for {clf_name}: {e}")  # noqa:E501
+                logger.info(f"Error occurred while explaining with LIME for {clf_name}: {e}")
