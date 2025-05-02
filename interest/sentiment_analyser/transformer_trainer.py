@@ -60,7 +60,6 @@ class TransformerTrainer:
 
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 model_name,
-                # num_labels=num_labels,
                 config=config,
                 ignore_mismatched_sizes=True
             )
@@ -105,10 +104,14 @@ class TransformerTrainer:
                 for k, v in batch.items()
             }
 
-            outputs = self.model(**batch)
-            labels = batch['labels']
+            model_inputs = {
+                k: batch[k] for k in ['input_ids', 'attention_mask', 'token_type_ids', 'labels']
+                if k in batch
+            }
+
+            outputs = self.model(**model_inputs)
+            labels = model_inputs['labels']
             loss = self.criterion(outputs.logits, labels)
-            #  loss = outputs.loss
             epoch_train_loss += loss.item()
 
             loss.backward()
@@ -160,7 +163,11 @@ class TransformerTrainer:
             }
 
             with torch.no_grad():
-                outputs = self.model(**batch)
+                model_inputs = {
+                    k: batch[k] for k in ['input_ids', 'attention_mask', 'token_type_ids', 'labels']
+                    if k in batch
+                }
+                outputs = self.model(**model_inputs)
                 total_loss += outputs.loss.item()
 
             logits = outputs.logits

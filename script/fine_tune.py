@@ -14,6 +14,7 @@ import random
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
+import pandas as pd
 from sklearn.model_selection import KFold
 import torch
 from torch.utils.data import DataLoader, Subset
@@ -358,10 +359,12 @@ def predict(args: argparse.Namespace) -> None:
     preprocessor = TextPreprocessor(model_name=args.model_name, max_length=args.max_length,
                                     lowercase=args.lowercase)
     data_loader = DataSetCreator(train_fp=Path(""), test_fp=args.test_fp)
+    is_labeled = args.label_field_name is not None and args.label_field_name != ""
 
-    # _, _, test_dataset = data_loader.create_datasets(
     _, test_dataset = data_loader.create_datasets(
-        label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
+        label_col=args.label_field_name if is_labeled else "",
+        text_col=args.text_field_name,
+        method=args.chunk_method,
         window_size=args.max_length,
         stride=args.stride, preprocessor=preprocessor
     )
@@ -379,13 +382,16 @@ def predict(args: argparse.Namespace) -> None:
     )
     trainer.load_model(args.model_path)
     trainer.model.eval()
-    probabilities: list[float] = []
-    labels = []
+    probabilities: list[float] = []  # list[np.ndarray] = []  #
     doc_probs = defaultdict(list)
     doc_labels = {}
     with torch.no_grad():
         for _, batch in enumerate(test_loader):
             doc_ids = batch.pop('doc_id')
+            if is_labeled:
+                batch_labels = batch.pop('labels').cpu().numpy()
+            else:
+                batch_labels = None
             batch = {k: v.squeeze(1).to(trainer.device).long() if k in ['input_ids',
                                                                         'attention_mask',
                                                                         'token_type_ids']
@@ -393,27 +399,42 @@ def predict(args: argparse.Namespace) -> None:
 
             outputs = trainer.model(**batch)
             logits = outputs.logits
-
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
-            labels = batch['labels'].cpu().numpy()
-            # probabilities.extend(prob.cpu().numpy())
-            # labels.extend(batch['labels'].cpu().numpy())
+
+            # labels = batch['labels'].cpu().numpy()
+            # #probabilities.extend(prob.cpu().numpy())
+            # #labels.extend(batch['labels'].cpu().numpy())
             for i, doc_id in enumerate(doc_ids):
                 doc_id = int(doc_id)
                 doc_probs[doc_id].append(probs[i])
-                doc_labels[doc_id] = labels[i]
+                if is_labeled:
+                    doc_labels[doc_id] = batch_labels[i]
+                # doc_labels[doc_id] = labels[i]
 
     labels = []
     for doc_id in sorted(doc_probs):
         mean_prob = np.mean(doc_probs[doc_id], axis=0)
         probabilities.append(mean_prob)
-        labels.append(doc_labels[doc_id])
+        if is_labeled:
+            labels.append(doc_labels[doc_id])
 
-    statistics = trainer.make_stats(labels, probabilities, output_dir=args.output_dir)
-    print(statistics)
-    save_statistics(statistics, args.output_dir,
-                    filename="prediction_statistics_" + Path(args.model_path).parent.name + ".json"
-                    )
+    if is_labeled:
+        statistics = trainer.make_stats(labels, probabilities, output_dir=args.output_dir)
+        print(statistics)
+        save_statistics(statistics, args.output_dir,
+                        filename="prediction_statistics_" + Path(args.model_path).parent.name + ".json"
+                        )
+    else:
+        predictions = np.argmax(probabilities, axis=1)
+        pred_df = pd.DataFrame({
+            "doc_id": list(sorted(doc_probs.keys())),
+            "prediction": predictions,
+            "confidence": [float(np.max(prob)) for prob in probabilities]
+        })
+
+        output_csv_path = Path(args.output_dir) / f"unlabeled_predictions_{Path(args.model_path).parent.name}.csv"
+        pred_df.to_csv(output_csv_path, index=False)
+        print(f"Predictions saved to {output_csv_path}")
 
 
 def explain_predict(args: argparse.Namespace) -> None:
@@ -540,7 +561,6 @@ def train(args: argparse.Namespace) -> None:
                                     lowercase=args.lowercase)
     data_loader = DataSetCreator(train_fp=args.train_fp, test_fp=Path(""))
 
-    # train_dataset, val_dataset, _ = data_loader.create_datasets(
     train_dataset, _ = data_loader.create_datasets(
         label_col=args.label_field_name, text_col=args.text_field_name, method=args.chunk_method,
         window_size=args.max_length,
