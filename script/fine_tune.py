@@ -421,9 +421,9 @@ def predict(args: argparse.Namespace) -> None:
     if is_labeled:
         statistics = trainer.make_stats(labels, probabilities, output_dir=args.output_dir)
         print(statistics)
-        save_statistics(statistics, args.output_dir,
-                        filename="prediction_statistics_" + Path(args.model_path).parent.name + ".json"
-                        )
+        model_name = Path(args.model_path).parent.name
+        filename = f"prediction_statistics_{model_name}.json"
+        save_statistics(statistics, args.output_dir, filename)
     else:
         predictions = np.argmax(probabilities, axis=1)
         pred_df = pd.DataFrame({
@@ -431,8 +431,9 @@ def predict(args: argparse.Namespace) -> None:
             "prediction": predictions,
             "confidence": [float(np.max(prob)) for prob in probabilities]
         })
-
-        output_csv_path = Path(args.output_dir) / f"unlabeled_predictions_{Path(args.model_path).parent.name}.csv"
+        model_name = Path(args.model_path).parent.name
+        filename = f"unlabeled_predictions_{model_name}.csv"
+        output_csv_path = Path(args.output_dir) / filename
         pred_df.to_csv(output_csv_path, index=False)
         print(f"Predictions saved to {output_csv_path}")
 

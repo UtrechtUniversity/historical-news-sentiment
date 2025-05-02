@@ -164,7 +164,8 @@ class TransformerTrainer:
 
             with torch.no_grad():
                 model_inputs = {
-                    k: batch[k] for k in ['input_ids', 'attention_mask', 'token_type_ids', 'labels']
+                    k: batch[k] for k in ['input_ids', 'attention_mask', 'token_type_ids',
+                                          'labels']
                     if k in batch
                 }
                 outputs = self.model(**model_inputs)

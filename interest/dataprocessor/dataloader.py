@@ -19,7 +19,7 @@ class TextDataset(Dataset):
     def __init__(
         self,
         texts: list[str],
-        labels: list,
+        labels: Optional[list],
         preprocessor,
         label_col: str,
         method: str,
@@ -31,7 +31,7 @@ class TextDataset(Dataset):
 
         Args:
             texts (list): List of text documents.
-            labels (list): List of corresponding labels.
+            labels Optional[list]: List of corresponding labels.
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
             label_col (str): Name of the column containing labels.
             method (str): Text segmentation method
