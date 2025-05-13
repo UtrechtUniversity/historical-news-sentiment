@@ -6,7 +6,7 @@ from sklearn.naive_bayes import ComplementNB  # type: ignore
 from sklearn.metrics import classification_report, confusion_matrix  # type: ignore  # noqa:E501
 from sklearn.metrics import roc_auc_score, roc_curve
 import matplotlib.pyplot as plt
-from typing import Tuple, Dict, List, Union, Any
+from typing import Tuple, Dict, List, Union, Any, Optional
 from lime.lime_text import LimeTextExplainer  # type: ignore
 import spacy  # type: ignore
 import spacy.cli  # type: ignore
@@ -15,6 +15,8 @@ import logging
 from interest.utils.logging_utils import setup_logging
 import os
 import joblib
+import numpy as np
+from numpy.typing import NDArray
 
 
 setup_logging()
@@ -44,13 +46,14 @@ class Classifier:
     def _strip_classifier_prefix(
             self,
             params: Union[Dict[str, Any], List[Tuple[str, Any]]],
-            valid_keys: List[str] = None) -> Dict[str, Any]:
+            valid_keys: Optional[List[str]] = None) -> Dict[str, Any]:
         """
-        Strip the 'classifier__' prefix from parameter keys and optionally filter to valid keys.
+        Strip the 'classifier__' prefix from parameter keys
+          and optionally filter to valid keys.
         """
         if isinstance(params, list):
             params = dict(params)
-        stripped = {key.split("classifier__")[-1]: val for key, val in params.items()}
+        stripped = {key.split("classifier__")[-1]: val for key, val in params.items()}  # noqa
         if valid_keys:
             stripped = {k: v for k, v in stripped.items() if k in valid_keys}
         return stripped
@@ -86,7 +89,7 @@ class Classifier:
                 best_params = json.load(f)
         except FileNotFoundError:
             logger.info(
-                f"Best parameters file '{results_file}' not found. Ensure hyperparameter "
+                f"Best parameters file '{results_file}' not found. Ensure hyperparameter "  # noqa
                 "optimization is completed."
             )
             return {}
@@ -94,19 +97,27 @@ class Classifier:
         classifiers: Dict[str, Any] = {
             "Gradient Boosting": GradientBoostingClassifier(
                 **self._strip_classifier_prefix(
-                    best_params.get("Gradient Boosting", {}).get("best_params", {}),
+                    best_params.get(
+                        "Gradient Boosting", {}).get("best_params", {}),
                     valid_keys=[
-                        "n_estimators", "learning_rate", "subsample", "min_samples_split",
-                        "min_samples_leaf", "max_depth", "max_features"
+                        "n_estimators",
+                        "learning_rate",
+                        "subsample",
+                        "min_samples_split",
+                        "min_samples_leaf",
+                        "max_depth",
+                        "max_features"
                     ]
                 ),
                 random_state=42,
             ),
             "Support Vector Machine": SVC(
                 **self._strip_classifier_prefix(
-                    best_params.get("Support Vector Machine", {}).get("best_params", {}),
+                    best_params.get(
+                        "Support Vector Machine", {}).get("best_params", {}),
                     valid_keys=[
-                        "C", "kernel", "degree", "gamma", "coef0", "shrinking", "probability"
+                        "C", "kernel", "degree", "gamma",
+                        "coef0", "shrinking", "probability"
                     ]
                 ),
                 class_weight="balanced",
@@ -115,7 +126,8 @@ class Classifier:
             ),
             "Logistic Regression": LogisticRegression(
                 **self._strip_classifier_prefix(
-                    best_params.get("Logistic Regression", {}).get("best_params", {}),
+                    best_params.get(
+                        "Logistic Regression", {}).get("best_params", {}),
                     valid_keys=[
                         "penalty", "C", "solver", "l1_ratio"
                     ]
@@ -126,10 +138,15 @@ class Classifier:
             ),
             "Random Forest": RandomForestClassifier(
                 **self._strip_classifier_prefix(
-                    best_params.get("Random Forest", {}).get("best_params", {}),
+                    best_params.get(
+                        "Random Forest", {}).get("best_params", {}),
                     valid_keys=[
-                        "n_estimators", "max_depth", "min_samples_split", "min_samples_leaf",
-                        "max_features", "bootstrap"
+                        "n_estimators",
+                        "max_depth",
+                        "min_samples_split",
+                        "min_samples_leaf",
+                        "max_features",
+                        "bootstrap"
                     ]
                 ),
                 class_weight="balanced",
@@ -160,7 +177,10 @@ class Classifier:
 
                 # Save the model
                 file_safe_name = clf_name.replace(" ", "_").lower()
-                model_path = os.path.join(model_dir, f"{file_safe_name}_{label_type}_model.joblib")
+                model_path = os.path.join(
+                    model_dir,
+                    f"{file_safe_name}_{label_type}_model.joblib"
+                )
                 joblib.dump(classifier, model_path)
                 logger.info(f"Saved {clf_name} to {model_path}")
             except Exception as e:
@@ -172,20 +192,26 @@ class Classifier:
         self,
         trained_classifiers: Dict[str, Any],
         text_test_vectorized: Union[List[str], List[int], List[float]],
-        label_test: Union[List[str], List[int], List[float]]
+        label_test: List[int]
     ) -> Tuple[List[float], List[float]]:
         """
-        Evaluate trained classifiers on the test data and print evaluation metrics.
+        Evaluate trained classifiers on the test data and print evaluation
+          metrics.
         For binary classification, also compute FPR and TPR for ROC plotting.
 
         Parameters:
-        - trained_classifiers (Dict[str, Any]): Dictionary of trained classifier objects.
-        - text_test_vectorized (Union[List[str], List[int], List[float]]): Vectorized test set.
-        - label_test (Union[List[str], List[int], List[float]]): Ground truth labels for test set.
+        - trained_classifiers (Dict[str, Any]):
+          Dictionary of trained classifier objects.
+        - text_test_vectorized (Union[List[str], List[int],
+          List[float]]): Vectorized test set.
+        - label_test (Union[List[str], List[int], List[float]]): Ground
+          truth labels for test set.
 
         Returns:
-        - Tuple[List[float], List[float]]: Lists of false positive rates and true positive rates
-        (only populated for binary classification; empty lists for multi-class).
+        - Tuple[List[float], List[float]]: Lists of false positive rates
+          and true positive rates
+        (only populated for binary classification; empty lists
+          for multi-class).
         """
         fpr_all: List[float] = []
         tpr_all: List[float] = []
@@ -197,11 +223,15 @@ class Classifier:
             try:
                 label_predicted = classifier.predict(text_test_vectorized)
                 if hasattr(classifier, "predict_proba"):
-                    label_pred_proba = classifier.predict_proba(text_test_vectorized)
+                    label_pred_proba = classifier.predict_proba(
+                        text_test_vectorized
+                    )
                 else:
-                    label_pred_proba = classifier.decision_function(text_test_vectorized)
+                    label_pred_proba = classifier.decision_function(
+                        text_test_vectorized)
 
-                self.print_evaluation_metrics(label_test, label_predicted, label_pred_proba)
+                self.print_evaluation_metrics(
+                    label_test, label_predicted, label_pred_proba)
 
                 if not is_multiclass:
                     fpr, tpr, _ = roc_curve(label_test, label_pred_proba[:, 1])
@@ -214,9 +244,9 @@ class Classifier:
 
     def print_evaluation_metrics(
         self,
-        label_test: Union[List[str], List[int], List[float]],
-        label_predicted: Union[List[str], List[int], List[float]],
-        label_pred_proba: Union[List[str], List[int], List[float]]
+        label_test: List[int],
+        label_predicted: List[int],
+        label_pred_proba: NDArray[np.float64]
     ) -> None:
         """
         Print classification report, confusion matrix, and AUC-ROC score.
@@ -224,15 +254,23 @@ class Classifier:
         Parameters:
         - label_test (array-like): True labels.
         - label_predicted (array-like): Predicted class labels.
-        - label_pred_proba (array-like): Predicted probabilities or decision scores.
+        - label_pred_proba (array-like): Predicted probabilities
+          or decision scores.
 
         Returns:
         - None
         """
         try:
             print("Classification Report:")
-            print(classification_report(label_test, label_predicted, zero_division=1))
-
+            print(classification_report(
+                label_test, label_predicted, zero_division=1))
+            print(
+                classification_report(
+                    label_test,
+                    label_predicted,
+                    zero_division=1
+                )
+            )
             print("\nConfusion Matrix:")
             print(confusion_matrix(label_test, label_predicted))
 
@@ -250,7 +288,8 @@ class Classifier:
             print(f"AUC-ROC: {auc_roc:.4f}")
             print('\n', '***************************************', '\n')
         except Exception as e:
-            logger.info(f"Error occurred while printing evaluation metrics: {e}")
+            logger.info(
+                f"Error occurred while printing evaluation metrics: {e}")
 
     def plot_roc_curves(self, fpr_all: List[float], tpr_all: List[float], classifiers: Dict[str, object]) -> None:  # noqa: E501
         """
@@ -269,7 +308,7 @@ class Classifier:
             plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
 
             for i, clf_name in enumerate(classifiers.keys()):
-                if i < len(fpr_all):  # Ensure we have matching fpr/tpr values for each classifier
+                if i < len(fpr_all):
                     plt.plot(fpr_all[i], tpr_all[i], lw=2, label=clf_name)
 
             plt.xlim([0.0, 1.0])
@@ -349,7 +388,9 @@ class Classifier:
         """
         from IPython.display import display, HTML  # ✅ safe import
 
-        print(f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}")
+        print(
+            f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}"
+            )
 
         explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])
 
@@ -368,7 +409,8 @@ class Classifier:
         os.makedirs(explain_dir, exist_ok=True)
 
         for file_safe_name in classifier_names:
-            model_path = os.path.join(model_dir, f"{file_safe_name}_{label_type}_model.joblib")
+            model_path = os.path.join(
+                model_dir, f"{file_safe_name}_{label_type}_model.joblib")
             clf_name = file_safe_name.replace("_", " ").title()
 
             try:
@@ -386,15 +428,24 @@ class Classifier:
                 )
 
                 custom_html = f"""
-                <div style="background-color: white; color: black; padding: 10px;">
+                <div style="background-color: white; color: black; padding: 10px;">  # noqa
                     {explanation.as_html()}
                 </div>
                 """
                 display(HTML(custom_html))
 
-                output_path = os.path.join(explain_dir, f"{file_safe_name}_lime_explanation.html")
+                output_path = os.path.join(
+                    explain_dir,
+                    f"{file_safe_name}_lime_explanation.html"
+                )
+
                 explanation.save_to_file(output_path)
-                logger.info(f"LIME explanation for {clf_name} saved to {output_path}")
+                logger.info(
+                    f"LIME explanation for {clf_name} saved to {output_path}")
 
             except Exception as e:
-                logger.info(f"Error occurred while explaining with LIME for {clf_name}: {e}")
+                logger.info(
+                    "Error occurred while explaining with LIME for %s: %s",
+                    clf_name,
+                    e
+                )
