@@ -390,7 +390,7 @@ class Classifier:
 
         print(
             f"Actual label: {'Positive' if label_sample == 1 else 'Negative'}"
-            )
+        )
 
         explainer = LimeTextExplainer(class_names=['Negative', 'Positive'])
 
