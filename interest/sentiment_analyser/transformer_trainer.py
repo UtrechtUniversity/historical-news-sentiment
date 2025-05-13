@@ -42,8 +42,14 @@ class TransformerTrainer:
         else:
             mlm_model = AutoModelForMaskedLM.from_pretrained(model_name)
 
-            mlm_model.load_state_dict(torch.load(mlm_model_path, map_location="cpu",
-                                                 weights_only=False), strict=False)
+            mlm_model.load_state_dict(
+                torch.load(
+                    mlm_model_path,
+                    map_location="cpu",
+                    weights_only=False
+                ),
+                strict=False
+            )
 
             self.model = AutoModelForSequenceClassification.from_pretrained(
                 model_name,
