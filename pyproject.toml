@@ -33,7 +33,8 @@ dependencies = [
     "captum",
     "tensorboard",
     "tensorboardX",
-    "spacy"
+    "spacy",
+    "Path"
 ]
 
 [project.optional-dependencies]
