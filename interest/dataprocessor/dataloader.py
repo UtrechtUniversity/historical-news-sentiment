@@ -19,7 +19,7 @@ class TextDataset(Dataset):
     def __init__(
         self,
         texts: list[str],
-        labels: list,
+        labels: Optional[list],
         preprocessor,
         label_col: str,
         method: str,
@@ -31,7 +31,7 @@ class TextDataset(Dataset):
 
         Args:
             texts (list): List of text documents.
-            labels (list): List of corresponding labels.
+            labels Optional[list]: List of corresponding labels.
             preprocessor (TextPreprocessor): Instance of the text preprocessor.
             label_col (str): Name of the column containing labels.
             method (str): Text segmentation method
@@ -48,18 +48,21 @@ class TextDataset(Dataset):
         self.stride = stride
         self.tokenized_data = self.tokenize_texts()
 
-    def tokenize_texts(self) -> list[tuple[dict, int]]:
+    def tokenize_texts(self) -> list[tuple[dict, int, int]]:
         """
         Tokenizes and segments the input texts using the specified method.
 
         Returns:
-            list[tuple[dict, int]]: A list of tokenized text segments and
-            their labels.
+            list[tuple[dict, int, int]]: A list of tuples, each containing:
+            - A dictionary representing the tokenized text segment,
+            - The corresponding label for the segment,
+            - The document ID the segment originated from.
         """
         tokenized_segments = []
         segment_labels = []
+        segment_doc_ids = []
 
-        for text, label in zip(self.texts, self.labels):
+        for doc_index, text in enumerate(self.texts):
             segments = self.preprocessor.preprocess_and_split(
                 text,
                 method=self.method,
@@ -69,9 +72,14 @@ class TextDataset(Dataset):
             for segment in segments:
                 tokens = self.preprocessor.tokenize(segment)
                 tokenized_segments.append(tokens)
-                segment_labels.append(label)
+                segment_doc_ids.append(doc_index)
+                if self.labels is not None:
+                    segment_labels.append(self.labels[doc_index])
 
-        return list(zip(tokenized_segments, segment_labels))
+        if self.labels is not None:
+            return list(zip(tokenized_segments, segment_labels, segment_doc_ids))
+
+        return list(zip(tokenized_segments, [-1] * len(tokenized_segments), segment_doc_ids))
 
     def __len__(self) -> int:
         """
@@ -90,8 +98,11 @@ class TextDataset(Dataset):
         Returns:
             dict: A dictionary containing tokenized inputs and the label.
         """
-        tokens, label = self.tokenized_data[idx]
-        tokens['labels'] = torch.tensor(label, dtype=torch.long)
+        tokens, label, doc_id = self.tokenized_data[idx]
+        tokens['doc_id'] = torch.tensor(doc_id, dtype=torch.long)
+        if self.labels is not None:
+            tokens['labels'] = torch.tensor(label, dtype=torch.long)
+
         return tokens
 
 
@@ -210,16 +221,21 @@ class DataSetCreator:
 
         if self.test_fp != Path(""):
             data_test = csv_dataloader.load_data(self.test_fp)
-            test_labels = data_test[label_col].values
             test_texts = data_test[text_col].values
-            if test_labels is not None:
+
+            if label_col != "" and label_col in data_test.columns:
+                test_labels = data_test[label_col].values
                 test_dataset = TextDataset(
                     test_texts.astype(str).tolist(),
                     test_labels.astype(int).tolist(), preprocessor, label_col,
                     method=method, window_size=window_size, stride=stride
                 )
             else:
-                raise ValueError(f"Column '{label_col}' in test data is None!")
+                test_dataset = TextDataset(
+                    test_texts.astype(str).tolist(),
+                    None, preprocessor, label_col,
+                    method=method, window_size=window_size, stride=stride
+                )
         return train_dataset, test_dataset
 
     def calculate_class_weights(self):
