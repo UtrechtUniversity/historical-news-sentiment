@@ -87,8 +87,11 @@ python script/fine_tune.py predict \
 Important Notes
 
 --batch_size, --freeze, and --lowercase must match the configuration used during model fine-tuning:
+
 If the model was trained with frozen layers, use --freeze True.
+
 If the model was fine-tuned using lowercased text, set --lowercase True. 
+
 Use the same --batch_size for consistency and compatibility.
 
 To predict on a labeled dataset, provide the --label_field_name argument (e.g., --label_field_name "label"), 
