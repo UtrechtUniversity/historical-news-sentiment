@@ -9,6 +9,7 @@ import logging  # type: ignore
 from tqdm import tqdm
 import matplotlib.pyplot as plt
 from sklearn.decomposition import PCA  # type: ignore
+import spacy
 from sklearn.metrics import (  # type: ignore
     accuracy_score,
     precision_score,
@@ -19,16 +20,16 @@ from sklearn.metrics import (  # type: ignore
     ConfusionMatrixDisplay
 )  # type: ignore
 
-nltk.download('punkt')
 # flake8: noqa: E501
 
 class SentimentAnalyser:
     def __init__(self, negative_words_fp: str, positive_words_fp: str, articles_fp: str, model_fp: str):  # noqa: E501
         self.negative_words_fp = negative_words_fp
         self.positive_words_fp = positive_words_fp
+        self.nlp = spacy.load("nl_core_news_sm")
         self.positive_words, self.negative_words = self._load_sentiment_words()
         self.articles_fp = articles_fp
-        self.articles, self.sentiment_labels = self._load_articles()
+        self.articles, self.sentiment_labels = self._load_articles(self.articles_fp)
         self.w2v_pretrained_model = gensim.models.KeyedVectors.load_word2vec_format(  # noqa: E501
             model_fp, binary=True)
         logging.basicConfig(
@@ -39,20 +40,21 @@ class SentimentAnalyser:
             filemode='w' 
         )
 
-    def _load_articles(self) -> Tuple[List[List[str]], List[int]]:
-        """
-        Load articles from the CSV file specified by `self.articles_fp`.
+    def _spacy_sent_tokenize(self, text: str) -> List[str]:
+        return [sent.text for sent in self.nlp(text).sents]
 
-        This method reads the CSV file, tokenizes the article text into sentences,
-        and extracts sentiment labels.
+    def _load_articles(self, filepath: str) -> Tuple[List[List[str]], List[int]]:
+        """
+        Loads and tokenizes articles from a CSV file.
+
+        Args:
+            filepath (str): Path to CSV file containing 'text' and 'label' columns.
 
         Returns:
-            Tuple[List[List[str]], List[int]]:
-                - A list where each element is a list of sentences from an article.
-                - A list of sentiment labels corresponding to each article.
+            Tuple[List[List[str]], List[int]]: A list of tokenized articles (each a list of sentences) and their corresponding sentiment labels.
         """
-        df = pd.read_csv(self.articles_fp)
-        articles = df['text'].apply(lambda x: sent_tokenize(x)).tolist()
+        df = pd.read_csv(filepath)
+        articles = df['text'].apply(lambda x: self._spacy_sent_tokenize(x)).tolist()
         sentiment_labels = df['final_label'].fillna(0)
         return articles, sentiment_labels.tolist()
 
