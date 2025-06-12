@@ -390,8 +390,6 @@ def parse_arguments() -> argparse.Namespace:
                             help='batch_size')
     parser_exp.add_argument('--model_path', type=str, required=True,
                             help='model path of a checkpoint')
-    parser_exp.add_argument('--use_exp', type=bool, default=False,
-                            help='use explainability')
     parser_exp.add_argument('--output_htmlfile', type=str, default="",
                             help='part of html file name including metadata etc')
 
@@ -454,9 +452,6 @@ def predict(args: argparse.Namespace) -> None:
             logits = outputs.logits
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
 
-            # labels = batch['labels'].cpu().numpy()
-            # #probabilities.extend(prob.cpu().numpy())
-            # #labels.extend(batch['labels'].cpu().numpy())
             for i, doc_id in enumerate(doc_ids):
                 doc_id = int(doc_id)
                 doc_probs[doc_id].append(probs[i])
@@ -534,10 +529,9 @@ def explain_predict(args: argparse.Namespace) -> None:
     labels = []
     attributions = []
 
-    if args.use_exp:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        model = trainer.model
-        ig = IntegratedGradients(custom_forward)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = trainer.model
+    ig = IntegratedGradients(custom_forward)
 
     random.seed(4500)
 
@@ -574,34 +568,33 @@ def explain_predict(args: argparse.Namespace) -> None:
             probabilities.extend(prob.cpu().numpy())
             labels.extend(batch['labels'].cpu().numpy())
 
-            if args.use_exp:
-                embedding_layer = trainer.model.get_input_embeddings()
-                input_embeddings = embedding_layer(batch['input_ids'])
+            embedding_layer = trainer.model.get_input_embeddings()
+            input_embeddings = embedding_layer(batch['input_ids'])
 
-                attributions_batch, _ = ig.attribute(
-                    inputs=input_embeddings,
-                    target=batch['labels'],
-                    additional_forward_args=batch['attention_mask'],
-                    n_steps=50,
-                    return_convergence_delta=True,
-                )
+            attributions_batch, _ = ig.attribute(
+                inputs=input_embeddings,
+                target=batch['labels'],
+                additional_forward_args=batch['attention_mask'],
+                n_steps=50,
+                return_convergence_delta=True,
+            )
 
-                for idx, attribution in enumerate(attributions_batch):
-                    token_attributions = attribution.cpu().detach().numpy()
-                    tokens = tokenizer.convert_ids_to_tokens(batch['input_ids'][idx].cpu().numpy())
-                    attribution_details = list(zip(tokens, token_attributions))
-                    attributions.append(attribution_details)
+            for idx, attribution in enumerate(attributions_batch):
+                token_attributions = attribution.cpu().detach().numpy()
+                tokens = tokenizer.convert_ids_to_tokens(batch['input_ids'][idx].cpu().numpy())
+                attribution_details = list(zip(tokens, token_attributions))
+                attributions.append(attribution_details)
 
-                    article_text = tokenizer.decode(batch['input_ids'][idx],
-                                                    skip_special_tokens=True)
+                article_text = tokenizer.decode(batch['input_ids'][idx],
+                                                skip_special_tokens=True)
 
-                    plot_path = Path(args.output_dir)\
-                        / f"attributions_class_{args.output_htmlfile}_{label}.png"
+                plot_path = Path(args.output_dir)\
+                    / f"attributions_class_{args.output_htmlfile}_{label}.png"
 
-                    save_attribution_plot(tokens, token_attributions, plot_path)
+                save_attribution_plot(tokens, token_attributions, plot_path)
 
-                    html_filename = f"explanation_class_{args.output_htmlfile}_{label}.html"
-                    save_explanation_html(article_text, plot_path, args.output_dir, html_filename)
+                html_filename = f"explanation_class_{args.output_htmlfile}_{label}.html"
+                save_explanation_html(article_text, plot_path, args.output_dir, html_filename)
 
 
 def train(args: argparse.Namespace) -> None:
