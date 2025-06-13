@@ -49,7 +49,7 @@ pip install -e .
 To train a BERT model, run the following:
 
 ```bash
-python script/fine_tune.py train \
+python interest/fine_tune.py train \
   --train_fp "<path_to_training_file>" \
   --output_dir "<path_to_output_directory>" \
   --model_name "<huggingface_model_name>" \
@@ -66,13 +66,13 @@ python script/fine_tune.py train \
 
 Note: These are the required parameters for training.
 Other optional parameters such as --chunk_method, --batch_size, --stride, etc.
-can be found and customized in script/fine_tune.py.
+can be found and customized in interest/fine_tune.py.
 
 ### Prediction
 To run a prediction on an unlabeled dataset
 
 ```bash
-python script/fine_tune.py predict \
+python interest/fine_tune.py predict \
   --test_fp "<path_to_test_file?" \
   --lowercase <True_or_False> \
   --freeze <True_or_False> \
@@ -104,7 +104,7 @@ in a specific article.
 
 To run:
 ```bash
-python script/fine_tune.py explain \
+python interest/fine_tune.py explain \
 --test_fp "<path_to_test_file>.csv" \
 --output_dir "<output_directory>" \
 --output_htmlfile "<html_file_base_name>" \
