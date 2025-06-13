@@ -29,7 +29,7 @@ from ray._private.utils import get_ray_temp_dir
 from ray.air import session
 from ray.train import Checkpoint
 
-from config_ray import search_space
+from config.config_ray import search_space
 from interest.dataprocessor.preprocessor import TextPreprocessor
 from interest.dataprocessor.dataloader import DataSetCreator
 from interest.sentiment_analyser.transformer_trainer import TransformerTrainer
