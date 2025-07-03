@@ -59,132 +59,100 @@ class Classifier:
         return stripped
 
     def train_classifiers(
-            self,
-            text_train_vectorized: Union[List[str], List[int], List[float]],
-            label_train: Union[List[str], List[int], List[float]],
-            binary_labels: bool = True,
-            model_dir: str = "./model",
-    ) -> Dict[str, object]:
+        self,
+        text_train_vectorized: Union[List[str], List[int], List[float]],
+        label_train: Union[List[str], List[int], List[float]],
+        binary_labels: bool = True,
+        model_dir: str = "./model"
+    ) -> Dict[str, Any]:
         """
-        Train multiple classifiers on the training data and save them to disk.
+        Train multiple classifiers, save models and vectorizers to disk.
 
         Parameters:
         - text_train_vectorized: Vectorized training data.
         - label_train: Training labels.
         - binary_labels: Whether it's a binary classification task.
-        - model_dir: Path to directory for saving trained models.
+        - model_dir: Directory to save trained models and vectorizers.
 
         Returns:
-        - Dict[str, object]: Dictionary of trained classifier objects.
+        - Dictionary of trained classifiers.
         """
+        label_type = "binary" if binary_labels else "multi"
+        model_dir_abs = os.path.abspath(model_dir)
+        os.makedirs(model_dir_abs, exist_ok=True)
 
         results_file = (
             "hyperparameter_results_binary.json"
-            if binary_labels
-            else "hyperparameter_results_multiclass.json"
+            if binary_labels else "hyperparameter_results_multiclass.json"
         )
 
         try:
-            with open(results_file, 'r') as f:
+            with open(results_file, "r") as f:
                 best_params = json.load(f)
         except FileNotFoundError:
-            logger.info(
-                f"Best parameters file '{results_file}' not found. Ensure hyperparameter "  # noqa
-                "optimization is completed."
-            )
+            logger.error(f"Missing hyperparameter file: {results_file}")
             return {}
 
-        classifiers: Dict[str, Any] = {
-            "Gradient Boosting": GradientBoostingClassifier(
-                **self._strip_classifier_prefix(
-                    best_params.get(
-                        "Gradient Boosting", {}).get("best_params", {}),
-                    valid_keys=[
-                        "n_estimators",
-                        "learning_rate",
-                        "subsample",
-                        "min_samples_split",
-                        "min_samples_leaf",
-                        "max_depth",
-                        "max_features"
-                    ]
-                ),
-                random_state=42,
-            ),
-            "Support Vector Machine": SVC(
-                **self._strip_classifier_prefix(
-                    best_params.get(
-                        "Support Vector Machine", {}).get("best_params", {}),
-                    valid_keys=[
-                        "C", "kernel", "degree", "gamma",
-                        "coef0", "shrinking", "probability"
-                    ]
-                ),
-                class_weight="balanced",
-                random_state=42,
-                probability=True,
-            ),
-            "Logistic Regression": LogisticRegression(
-                **self._strip_classifier_prefix(
-                    best_params.get(
-                        "Logistic Regression", {}).get("best_params", {}),
-                    valid_keys=[
-                        "penalty", "C", "solver", "l1_ratio"
-                    ]
-                ),
-                class_weight="balanced",
-                max_iter=1000,
-                random_state=42,
-            ),
-            "Random Forest": RandomForestClassifier(
-                **self._strip_classifier_prefix(
-                    best_params.get(
-                        "Random Forest", {}).get("best_params", {}),
-                    valid_keys=[
-                        "n_estimators",
-                        "max_depth",
-                        "min_samples_split",
-                        "min_samples_leaf",
-                        "max_features",
-                        "bootstrap"
-                    ]
-                ),
-                class_weight="balanced",
-                random_state=42,
-            ),
-            "Naive Bayes": ComplementNB(
-                **self._strip_classifier_prefix(
-                    best_params.get("Naive Bayes", {}).get("best_params", {}),
-                    valid_keys=[
-                        "alpha", "norm"
-                    ]
-                )
-            ),
+        classifier_specs: Dict[str, Tuple[Any, List[str]]] = {
+            "Gradient Boosting": (GradientBoostingClassifier, [
+                "n_estimators", "learning_rate", "subsample", "min_samples_split",
+                "min_samples_leaf", "max_depth", "max_features"
+            ]),
+            "Support Vector Machine": (SVC, [
+                "C", "kernel", "degree", "gamma", "coef0", "shrinking",
+                "probability"
+            ]),
+            "Logistic Regression": (LogisticRegression, [
+                "penalty", "C", "solver", "l1_ratio"
+            ]),
+            "Random Forest": (RandomForestClassifier, [
+                "n_estimators", "max_depth", "min_samples_split",
+                "min_samples_leaf", "max_features", "bootstrap"
+            ]),
+            "Naive Bayes": (ComplementNB, ["alpha", "norm"]),
         }
 
-        # Make sure model_dir exists
-        model_dir = os.path.abspath(model_dir)
-        os.makedirs(model_dir, exist_ok=True)
-
         trained_classifiers: Dict[str, Any] = {}
-        label_type = "binary" if binary_labels else "multi"
 
-        for clf_name, classifier in classifiers.items():
-            print(f"Training {clf_name}...")
+        for name, (cls, valid_keys) in classifier_specs.items():
+            print(f"Training {name}...")
             try:
-                classifier.fit(text_train_vectorized, label_train)
-                trained_classifiers[clf_name] = classifier
+                params = best_params.get(name, {}).get("best_params", {})
+                clean_params = self._strip_classifier_prefix(params, valid_keys)
 
-                # Save the model
-                file_safe_name = clf_name.replace(" ", "_").lower()
+                if name == "Support Vector Machine":
+                    clean_params["class_weight"] = "balanced"
+                    clean_params["random_state"] = 42
+                    clean_params["probability"] = True
+                elif name in ["Logistic Regression", "Random Forest", "Gradient Boosting"]:
+                    clean_params["random_state"] = 42
+                    if name != "Gradient Boosting":
+                        clean_params["class_weight"] = "balanced"
+                    if name == "Logistic Regression":
+                        clean_params["max_iter"] = 1000
+
+                model = cls(**clean_params)
+                model.fit(text_train_vectorized, label_train)
+
+                # Save model
+                file_safe_name = name.replace(" ", "_").lower()
                 model_path = os.path.join(
-                    model_dir,
-                    f"{file_safe_name}_{label_type}_model.joblib"
+                    model_dir_abs, f"{file_safe_name}_{label_type}_model.joblib"
                 )
-                joblib.dump(classifier, model_path)
-                logger.info(f"Saved {clf_name} to {model_path}")
+                joblib.dump(model, model_path)
+                logger.info(f"Saved model: {model_path}")
+
+                # Save vectorizer
+                vectorizer_path = os.path.join(
+                    model_dir_abs, f"{file_safe_name}_{label_type}_vectorizer.joblib"
+                )
+                joblib.dump(self.vectorizer, vectorizer_path)
+                logger.info(f"Saved vectorizer: {vectorizer_path}")
+
+                trained_classifiers[name] = model
+
             except Exception as e:
-                logger.info(f"Error occurred while training {clf_name}: {e}")
+                logger.error(f"Failed to train {name}: {e}")
 
         return trained_classifiers
 
@@ -290,6 +258,49 @@ class Classifier:
         except Exception as e:
             logger.info(
                 f"Error occurred while printing evaluation metrics: {e}")
+
+    def predict_on_unseen_data(
+        self,
+        raw_texts: List[str],
+        model_name: str,
+        binary: bool = True,
+        model_dir: str = "./model"
+    ) -> List[int]:
+        """
+        Load model and vectorizer from disk and predict labels for raw texts.
+
+        Parameters:
+        - raw_texts (List[str]): Unseen raw input texts.
+        - model_name (str): Lowercased, underscore-separated classifier name (e.g. 'logistic_regression').
+        - binary (bool): Whether the model is binary classification.
+        - model_dir (str): Directory where model and vectorizer are stored.
+
+        Returns:
+        - List[int]: Predicted class labels.
+        """
+        try:
+            label_type = "binary" if binary else "multi"
+            model_path = os.path.join(
+                os.path.abspath(model_dir),
+                f"{model_name}_{label_type}_model.joblib"
+            )
+            vectorizer_path = os.path.join(
+                os.path.abspath(model_dir),
+                f"{model_name}_{label_type}_vectorizer.joblib"
+            )
+
+            classifier = joblib.load(model_path)
+            vectorizer: TfidfVectorizer = joblib.load(vectorizer_path)
+
+            transformed_texts = vectorizer.transform(raw_texts)
+            predictions = classifier.predict(transformed_texts)
+
+            return predictions.tolist()
+
+        except Exception as e:
+            logger.error(f"Prediction failed for {model_name}: {e}")
+            return []
+
 
     def plot_roc_curves(self, fpr_all: List[float], tpr_all: List[float], classifiers: Dict[str, object]) -> None:  # noqa: E501
         """
