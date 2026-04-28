@@ -5,12 +5,13 @@ training loss visualization, and saving statistics.
 """
 import argparse
 from argparse import ArgumentParser
+import base64
 from collections import defaultdict
 import json
 import os
 from pathlib import Path
 import random
-
+from typing import Union, List
 import matplotlib.pyplot as plt
 import numpy as np
 from numpy.typing import NDArray
@@ -28,7 +29,7 @@ from ray._private.utils import get_ray_temp_dir
 from ray.air import session
 from ray.train import Checkpoint
 
-from config_ray import search_space
+from config.config_ray import search_space
 from interest.dataprocessor.preprocessor import TextPreprocessor
 from interest.dataprocessor.dataloader import DataSetCreator
 from interest.sentiment_analyser.transformer_trainer import TransformerTrainer
@@ -250,19 +251,68 @@ def save_statistics(statistics: dict, output_dir: Path,
     print(f"Statistics saved to {file_path}")
 
 
-def save_attribution_plot(tokens, scores, output_dir, filename):
+def save_explanation_html(
+    article_text: str,
+    image_path: Union[str, Path],
+    output_dir: Union[str, Path],
+    filename: str
+) -> None:
     """
-    Save a bar plot of the top 20 token attributions.
+    Saves an HTML file combining article text and a base64-encoded attribution plot.
 
     Args:
-        tokens (list): Tokens corresponding to the input IDs.
-        scores (np.array): Attribution scores for each token. Can be multi-dimensional.
-        output_dir (str): Directory to save the plot.
-        filename (str): Filename for the plot.
+        article_text (str): The text of the article to display.
+        image_path (str or Path): Path to the attribution plot image.
+        output_dir (str or Path): Directory where the HTML file will be saved.
+        filename (str): Name of the output HTML file.
 
     Returns:
         None
     """
+
+    output_dir = Path(output_dir)
+    output_dir.mkdir(parents=True, exist_ok=True)
+
+    # Read and base64-encode the image
+    with open(image_path, "rb") as img_file:
+        encoded_img = base64.b64encode(img_file.read()).decode("utf-8")
+
+    html_content = f"""
+    <html>
+    <head>
+    <meta charset="UTF-8">
+    <title>Attribution Explanation</title>
+    </head>
+    <body>
+        <h2>📰 Article</h2>
+        <p style="font-family:monospace;white-space:pre-wrap;">{article_text}</p>
+        <h2>📊 Attribution Plot</h2>
+        <img src="data:image/png;base64,{encoded_img}" alt="Attribution Plot" />
+    </body>
+    </html>
+    """
+
+    with open(output_dir / filename, "w", encoding="utf-8") as f:
+        f.write(html_content)
+
+
+def save_attribution_plot(
+    tokens: List[str],
+    scores: np.ndarray,
+    filepath: Union[str, Path]
+) -> None:
+    """
+    Saves a bar plot of the top token attributions to a file.
+
+    Args:
+        tokens (List[str]): List of tokens corresponding to input text.
+        scores (np.ndarray): Attribution scores for each token.
+        filepath (str or Path): Full path to save the output plot.
+
+    Returns:
+        None
+    """
+
     if len(scores.shape) > 1:
         scores = scores.sum(axis=1)  # Sum attribution scores across embedding dimensions
 
@@ -270,7 +320,7 @@ def save_attribution_plot(tokens, scores, output_dir, filename):
     abs_scores = [abs(score) for score in scores]
 
     # Get the top 20 tokens and their scores
-    top_indices = sorted(range(len(abs_scores)), key=lambda i: abs_scores[i], reverse=True)[:20]
+    top_indices = sorted(range(len(abs_scores)), key=lambda i: abs_scores[i], reverse=True)[:50]
     top_tokens = [tokens[i] for i in top_indices]
     top_scores = [scores[i] for i in top_indices]
 
@@ -282,9 +332,9 @@ def save_attribution_plot(tokens, scores, output_dir, filename):
     plt.tight_layout()
 
     # Save the plot
-    output_path = Path(output_dir)
-    output_path.mkdir(parents=True, exist_ok=True)  # Ensure output directory exists
-    plt.savefig(output_path / filename)
+    filepath = Path(filepath)
+    filepath.parent.mkdir(parents=True, exist_ok=True)  # Ensure output directory exists
+    plt.savefig(filepath)
     plt.close()
 
 
@@ -340,8 +390,9 @@ def parse_arguments() -> argparse.Namespace:
                             help='batch_size')
     parser_exp.add_argument('--model_path', type=str, required=True,
                             help='model path of a checkpoint')
-    parser_exp.add_argument('--use_exp', type=bool, default=False,
-                            help='use explainability')
+    parser_exp.add_argument('--output_htmlfile', type=str, default="",
+                            help='part of html file name including metadata etc')
+
     return main_parser.parse_args()
 
 
@@ -401,9 +452,6 @@ def predict(args: argparse.Namespace) -> None:
             logits = outputs.logits
             probs = torch.softmax(logits, dim=-1).cpu().numpy()
 
-            # labels = batch['labels'].cpu().numpy()
-            # #probabilities.extend(prob.cpu().numpy())
-            # #labels.extend(batch['labels'].cpu().numpy())
             for i, doc_id in enumerate(doc_ids):
                 doc_id = int(doc_id)
                 doc_probs[doc_id].append(probs[i])
@@ -481,12 +529,11 @@ def explain_predict(args: argparse.Namespace) -> None:
     labels = []
     attributions = []
 
-    if args.use_exp:
-        tokenizer = AutoTokenizer.from_pretrained(args.model_name)
-        model = trainer.model
-        ig = IntegratedGradients(custom_forward)
+    tokenizer = AutoTokenizer.from_pretrained(args.model_name)
+    model = trainer.model
+    ig = IntegratedGradients(custom_forward)
 
-    random.seed(42)
+    random.seed(4500)
 
     # Select one random article per class
     articles_by_class = {}
@@ -506,13 +553,14 @@ def explain_predict(args: argparse.Namespace) -> None:
                 articles_by_class[label] = single_article
 
     # Disable gradient computation
-    with torch.no_grad():
+    with (((torch.no_grad()))):
         for label, batch in articles_by_class.items():
             batch = {k: v.squeeze(1).to(trainer.device).long() if k in ['input_ids',
                                                                         'attention_mask',
                                                                         'token_type_ids']
                      else v.to(trainer.device).long() for k, v in batch.items()}
 
+            batch.pop("doc_id", None)
             outputs = trainer.model(**batch)
             logits = outputs.logits
 
@@ -520,26 +568,33 @@ def explain_predict(args: argparse.Namespace) -> None:
             probabilities.extend(prob.cpu().numpy())
             labels.extend(batch['labels'].cpu().numpy())
 
-            if args.use_exp:
-                embedding_layer = trainer.model.get_input_embeddings()
-                input_embeddings = embedding_layer(batch['input_ids'])
+            embedding_layer = trainer.model.get_input_embeddings()
+            input_embeddings = embedding_layer(batch['input_ids'])
 
-                attributions_batch, _ = ig.attribute(
-                    inputs=input_embeddings,
-                    target=batch['labels'],
-                    additional_forward_args=batch['attention_mask'],
-                    n_steps=50,
-                    return_convergence_delta=True,
-                )
+            attributions_batch, _ = ig.attribute(
+                inputs=input_embeddings,
+                target=batch['labels'],
+                additional_forward_args=batch['attention_mask'],
+                n_steps=50,
+                return_convergence_delta=True,
+            )
 
-                for idx, attribution in enumerate(attributions_batch):
-                    token_attributions = attribution.cpu().detach().numpy()
-                    tokens = tokenizer.convert_ids_to_tokens(batch['input_ids'][idx].cpu().numpy())
-                    attribution_details = list(zip(tokens, token_attributions))
-                    attributions.append(attribution_details)
+            for idx, attribution in enumerate(attributions_batch):
+                token_attributions = attribution.cpu().detach().numpy()
+                tokens = tokenizer.convert_ids_to_tokens(batch['input_ids'][idx].cpu().numpy())
+                attribution_details = list(zip(tokens, token_attributions))
+                attributions.append(attribution_details)
 
-                save_attribution_plot(tokens, attributions_batch[idx].cpu().detach().numpy(),
-                                      args.output_dir, f"attributions_class_{label}.png")
+                article_text = tokenizer.decode(batch['input_ids'][idx],
+                                                skip_special_tokens=True)
+
+                plot_path = Path(args.output_dir)\
+                    / f"attributions_class_{args.output_htmlfile}_{label}.png"
+
+                save_attribution_plot(tokens, token_attributions, plot_path)
+
+                html_filename = f"explanation_class_{args.output_htmlfile}_{label}.html"
+                save_explanation_html(article_text, plot_path, args.output_dir, html_filename)
 
 
 def train(args: argparse.Namespace) -> None:
